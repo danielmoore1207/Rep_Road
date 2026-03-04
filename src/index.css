@@ -1,0 +1,70 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html,
+body,
+#root {
+  width: 100%;
+  min-height: 100%;
+  background-color: #0b0b0b;
+}
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
+  overscroll-behavior: none;
+}
+
+a,
+button {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.brand-title {
+  font-family: 'Bebas Neue', 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif;
+  letter-spacing: 0.04em;
+}
+
+/* Black/red theme overrides for common blue utilities */
+/* Black/red theme overrides for common blue utilities */
+.bg-blue-600 { background-color: #0b0b0b !important; }
+.bg-blue-700 { background-color: #111111 !important; }
+.bg-blue-50 { background-color: #1a0b0b !important; }
+.bg-blue-900\/20 { background-color: rgba(127, 29, 29, 0.2) !important; }
+.text-blue-600 { color: #dc2626 !important; }
+.text-blue-400 { color: #f87171 !important; }
+.border-blue-600 { border-color: #dc2626 !important; }
+.border-blue-200 { border-color: #7f1d1d !important; }
+.border-blue-800 { border-color: #7f1d1d !important; }
+.accent-blue-600 { accent-color: #dc2626 !important; }
+
+/* Light mode: white background, light gray boxes */
+html:not(.dark) .bg-gray-100 { background-color: #ffffff !important; }
+html:not(.dark) .bg-white { background-color: #f3f4f6 !important; }
+
+/* Dark mode: mostly black with lighter black outlines */
+html.dark .bg-white { background-color: #0b0b0b !important; }
+html.dark .bg-gray-100 { background-color: #050505 !important; }
+html.dark .bg-gray-50 { background-color: #0f0f0f !important; }
+html.dark .bg-gray-700 { background-color: #141414 !important; }
+html.dark .bg-gray-800 { background-color: #0b0b0b !important; }
+html.dark .bg-gray-900 { background-color: #050505 !important; }
+
+html.dark .border-gray-200 { border-color: #1f1f1f !important; }
+html.dark .border-gray-300 { border-color: #1f1f1f !important; }
+html.dark .border-gray-600 { border-color: #1f1f1f !important; }
+html.dark .border-gray-700 { border-color: #1f1f1f !important; }
+
+html.dark .profile-page .text-gray-700,
+html.dark .profile-page .text-gray-600,
+html.dark .profile-page .text-gray-500,
+html.dark .profile-page .text-gray-400 {
+  color: #f3f4f6 !important;
+}
