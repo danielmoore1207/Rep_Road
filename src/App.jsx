@@ -22,28 +22,27 @@ function Navigation({ theme }) {
   const navText = 'text-white';
 
   return (
-    <nav className={`${navBg} ${navText} shadow-lg`}>
+    <nav
+      className={`${navBg} ${navText} shadow-lg fixed bottom-0 left-0 right-0 z-50`}
+      style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+      aria-label="Primary"
+    >
       <div className="container mx-auto px-4">
-        <div className="flex items-center justify-between h-16">
-          <div className="flex items-center space-x-2">
-            <h1 className="text-2xl brand-title">RepRoad</h1>
-          </div>
-          <div className="flex space-x-1">
-            {navItems.map((item) => (
-              <Link
-                key={item.path}
-                to={item.path}
-                className={`px-3 py-2 rounded-lg transition-colors text-sm ${
-                  location.pathname === item.path
-                    ? 'border border-red-600 text-white'
-                    : 'text-gray-300 hover:border hover:border-red-700'
-                }`}
-              >
-                <span className="mr-1">{item.icon}</span>
-                <span className="hidden sm:inline">{item.label}</span>
-              </Link>
-            ))}
-          </div>
+        <div className="flex items-center justify-around h-16">
+          {navItems.map((item) => (
+            <Link
+              key={item.path}
+              to={item.path}
+              className={`px-3 py-2 rounded-lg transition-colors text-sm flex flex-col items-center ${
+                location.pathname === item.path
+                  ? 'border border-red-600 text-white'
+                  : 'text-gray-300 hover:border hover:border-red-700'
+              }`}
+            >
+              <span className="text-lg">{item.icon}</span>
+              <span className="text-[11px] leading-none mt-1">{item.label}</span>
+            </Link>
+          ))}
         </div>
       </div>
     </nav>
@@ -274,7 +273,7 @@ function AppContent({
   return (
     <div className="min-h-screen bg-gray-100 dark:bg-gray-900 transition-colors">
       <Navigation theme={theme} />
-      <main className="container mx-auto px-4 py-8 pb-24">
+      <main className="container mx-auto px-4 py-8 pb-28">
         {supabaseError && (
           <div className="mb-4 bg-red-50 dark:bg-red-900/20 border border-red-300 dark:border-red-800 text-red-700 dark:text-red-300 px-4 py-3 rounded-lg text-sm">
             Supabase: {supabaseError}
