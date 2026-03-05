@@ -15,6 +15,7 @@ const MUSCLE_GROUPS = [
 function CreateRoutine({ exercises, routines, onUpdate, onExerciseUpdate, supabaseConfigured }) {
   const [showForm, setShowForm] = useState(false);
   const [editingRoutine, setEditingRoutine] = useState(null);
+  const [expandedRoutineId, setExpandedRoutineId] = useState(null);
   const [formData, setFormData] = useState({
     name: '',
     exercises: [],
@@ -152,6 +153,7 @@ function CreateRoutine({ exercises, routines, onUpdate, onExerciseUpdate, supaba
     });
     setEditingRoutine(routine);
     setShowForm(true);
+    setExpandedRoutineId(routine.id);
   };
 
   const handleDelete = (id) => {
@@ -159,6 +161,9 @@ function CreateRoutine({ exercises, routines, onUpdate, onExerciseUpdate, supaba
       const updatedRoutines = routines.filter(r => r.id !== id);
       storage.saveRoutines(updatedRoutines);
       onUpdate(updatedRoutines);
+      if (expandedRoutineId === id) {
+        setExpandedRoutineId(null);
+      }
     }
   };
 
@@ -436,36 +441,32 @@ function CreateRoutine({ exercises, routines, onUpdate, onExerciseUpdate, supaba
               const exercise = exercises.find(ex => ex.id === re.exerciseId);
               return { ...re, exercise };
             }).filter(re => re.exercise);
+            const isExpanded = expandedRoutineId === routine.id;
 
             return (
               <div key={routine.id} className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
-                <div className="flex justify-between items-start mb-4">
-                  <div>
-                    <h3 className="text-xl font-bold dark:text-white">{routine.name}</h3>
-                    <p className="text-gray-600 dark:text-gray-400 text-sm">
-                      {routineExercises.length} exercise{routineExercises.length !== 1 ? 's' : ''}
-                    </p>
+                <button
+                  type="button"
+                  onClick={() => setExpandedRoutineId(isExpanded ? null : routine.id)}
+                  className="w-full text-left"
+                  aria-expanded={isExpanded}
+                  aria-controls={`routine-${routine.id}`}
+                >
+                  <div className="flex justify-between items-start mb-4">
+                    <div>
+                      <h3 className="text-xl font-bold dark:text-white">{routine.name}</h3>
+                      <p className="text-gray-600 dark:text-gray-400 text-sm">
+                        {routineExercises.length} exercise{routineExercises.length !== 1 ? 's' : ''}
+                      </p>
+                    </div>
+                    <div className="text-gray-400 text-lg">
+                      {isExpanded ? '▾' : '▸'}
+                    </div>
                   </div>
-                  <div className="flex space-x-2">
-                    <button
-                      onClick={() => handleEdit(routine)}
-                      className="text-blue-500 hover:text-blue-700 text-sm"
-                      title="Edit routine"
-                    >
-                      ✏️
-                    </button>
-                    <button
-                      onClick={() => handleDelete(routine.id)}
-                      className="text-red-500 hover:text-red-700 text-sm"
-                      title="Delete routine"
-                    >
-                      ×
-                    </button>
-                  </div>
-                </div>
-                
-                <div className="space-y-2">
-                  {routineExercises.map((re, idx) => (
+                </button>
+
+                <div id={`routine-${routine.id}`} className="space-y-2">
+                  {isExpanded && routineExercises.map((re, idx) => (
                     <div key={idx} className="bg-gray-50 dark:bg-gray-700 p-2 rounded text-sm">
                       <div className="font-medium dark:text-white">{re.exercise.name}</div>
                       <div className="text-gray-600 dark:text-gray-400 text-xs">
@@ -473,6 +474,23 @@ function CreateRoutine({ exercises, routines, onUpdate, onExerciseUpdate, supaba
                       </div>
                     </div>
                   ))}
+                </div>
+
+                <div className="flex space-x-2 mt-4">
+                  <button
+                    onClick={() => handleEdit(routine)}
+                    className="text-blue-500 hover:text-blue-700 text-sm"
+                    title="Edit routine"
+                  >
+                    ✏️
+                  </button>
+                  <button
+                    onClick={() => handleDelete(routine.id)}
+                    className="text-red-500 hover:text-red-700 text-sm"
+                    title="Delete routine"
+                  >
+                    ×
+                  </button>
                 </div>
               </div>
             );
