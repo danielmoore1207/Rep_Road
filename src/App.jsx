@@ -53,7 +53,7 @@ function FloatingActionButton({ onClick }) {
   return (
     <button
       onClick={onClick}
-      className="fixed bottom-6 right-6 w-14 h-14 bg-black text-red-500 border border-red-600 rounded-full shadow-lg hover:bg-red-900/20 transition-colors flex items-center justify-center text-2xl z-50"
+      className="fixed bottom-24 right-6 w-14 h-14 bg-black text-red-500 border border-red-600 rounded-full shadow-lg hover:bg-red-900/20 transition-colors flex items-center justify-center text-2xl z-50"
       aria-label="Log Workout"
     >
       +
