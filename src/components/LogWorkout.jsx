@@ -78,20 +78,7 @@ function LogWorkout({ routines, exercises, onSessionAdd, onExerciseUpdate, rpeEn
 
   // Start timer when routine is selected or quick mode starts
   useEffect(() => {
-    if (isActiveWorkout && !startTime) {
-      const now = Date.now();
-      setStartTime(now);
-      setElapsedSeconds(0);
-      const interval = setInterval(() => {
-        setElapsedSeconds(prev => prev + 1);
-      }, 1000);
-      setTimerInterval(interval);
-      
-      return () => {
-        clearInterval(interval);
-      };
-    } else if (!isActiveWorkout && startTime) {
-      // Clean up timer if workout ends
+    if (!isActiveWorkout) {
       if (timerInterval) {
         clearInterval(timerInterval);
         setTimerInterval(null);
@@ -99,8 +86,26 @@ function LogWorkout({ routines, exercises, onSessionAdd, onExerciseUpdate, rpeEn
       setStartTime(null);
       setElapsedSeconds(0);
       setWorkoutDate(getTodayDateString());
+      return;
     }
-  }, [isActiveWorkout]);
+
+    const effectiveStart = startTime || Date.now();
+    if (!startTime) {
+      setStartTime(effectiveStart);
+    }
+
+    const tick = () => {
+      setElapsedSeconds(Math.max(0, Math.floor((Date.now() - effectiveStart) / 1000)));
+    };
+    tick();
+
+    const interval = setInterval(tick, 1000);
+    setTimerInterval(interval);
+
+    return () => {
+      clearInterval(interval);
+    };
+  }, [isActiveWorkout, startTime]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -196,7 +201,9 @@ function LogWorkout({ routines, exercises, onSessionAdd, onExerciseUpdate, rpeEn
 
   useEffect(() => {
     if (!isActiveWorkout) {
-      storage.clearActiveWorkoutDraft();
+      if (hasRestoredDraft.current) {
+        storage.clearActiveWorkoutDraft();
+      }
       return;
     }
     const draft = {
@@ -333,6 +340,19 @@ function LogWorkout({ routines, exercises, onSessionAdd, onExerciseUpdate, rpeEn
       return next;
     });
     setDraggingKey(null);
+  };
+
+  const moveExerciseSlot = (slotKey, direction) => {
+    setWorkoutOrder((prev) => {
+      const next = [...prev];
+      const index = next.indexOf(slotKey);
+      if (index === -1) return prev;
+      const nextIndex = direction === 'up' ? index - 1 : index + 1;
+      if (nextIndex < 0 || nextIndex >= next.length) return prev;
+      const [moved] = next.splice(index, 1);
+      next.splice(nextIndex, 0, moved);
+      return next;
+    });
   };
 
   const handleReplaceExercise = (slotKey, newExerciseId) => {
@@ -519,25 +539,26 @@ function LogWorkout({ routines, exercises, onSessionAdd, onExerciseUpdate, rpeEn
             </div>
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Select Routine *
-            </label>
-            <select
-              value={selectedRoutine}
-              onChange={(e) => setSelectedRoutine(e.target.value)}
-              disabled={logMode === 'quick'}
-              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white disabled:opacity-60"
-              required={logMode === 'routine'}
-            >
-              <option value="">Choose a routine...</option>
-              {routines.map(routine => (
-                <option key={routine.id} value={routine.id}>
-                  {routine.name} ({routine.exercises.length} exercises)
-                </option>
-              ))}
-            </select>
-          </div>
+          {logMode === 'routine' && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Select Routine *
+              </label>
+              <select
+                value={selectedRoutine}
+                onChange={(e) => setSelectedRoutine(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                required
+              >
+                <option value="">Choose a routine...</option>
+                {routines.map(routine => (
+                  <option key={routine.id} value={routine.id}>
+                    {routine.name} ({routine.exercises.length} exercises)
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           {/* Workout Date */}
           {isActiveWorkout && (
@@ -550,7 +571,7 @@ function LogWorkout({ routines, exercises, onSessionAdd, onExerciseUpdate, rpeEn
                 value={workoutDate}
                 onChange={(e) => setWorkoutDate(e.target.value)}
                 max={getTodayDateString()}
-                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                className="w-full max-w-full min-w-0 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
               />
             </div>
           )}
@@ -714,6 +735,24 @@ function LogWorkout({ routines, exercises, onSessionAdd, onExerciseUpdate, rpeEn
                           >
                             ☰
                           </button>
+                          <div className="flex flex-col">
+                            <button
+                              type="button"
+                              onClick={() => moveExerciseSlot(slotKey, 'up')}
+                              className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 text-xs leading-none"
+                              aria-label="Move up"
+                            >
+                              ▲
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => moveExerciseSlot(slotKey, 'down')}
+                              className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 text-xs leading-none"
+                              aria-label="Move down"
+                            >
+                              ▼
+                            </button>
+                          </div>
                           <h3 className="text-lg font-bold dark:text-white">{exercise.name}</h3>
                         </div>
                         <p className="text-sm text-gray-600 dark:text-gray-400">
