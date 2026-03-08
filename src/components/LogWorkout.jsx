@@ -603,7 +603,7 @@ function LogWorkout({ routines, exercises, onSessionAdd, onExerciseUpdate, rpeEn
                     onChange={(e) => setQuickMuscleGroup(e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                   >
-                    <option value="">All groups</option>
+                    <option value="">Select muscle group...</option>
                     {[...new Set(exercises.map((ex) => ex.muscleGroup))].map((group) => (
                       <option key={group} value={group}>{group}</option>
                     ))}
@@ -616,7 +616,8 @@ function LogWorkout({ routines, exercises, onSessionAdd, onExerciseUpdate, rpeEn
                   <select
                     value={quickExerciseId}
                     onChange={(e) => setQuickExerciseId(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    disabled={!quickMuscleGroup}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white disabled:opacity-60"
                   >
                     <option value="">Select exercise...</option>
                     {filteredQuickExercises.map((ex) => (
