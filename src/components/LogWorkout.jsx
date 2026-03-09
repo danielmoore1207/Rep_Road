@@ -16,7 +16,7 @@ function LogWorkout({ routines, exercises, onSessionAdd, onExerciseUpdate, rpeEn
   const [workoutOrder, setWorkoutOrder] = useState([]);
   const [draggingKey, setDraggingKey] = useState(null);
   const draggingKeyRef = useRef(null);
-  const touchTargetKeyRef = useRef(null);
+  const pointerIdRef = useRef(null);
   const [quickMuscleGroup, setQuickMuscleGroup] = useState('');
   const [quickExerciseId, setQuickExerciseId] = useState('');
   const [quickNewExerciseName, setQuickNewExerciseName] = useState('');
@@ -350,23 +350,29 @@ function LogWorkout({ routines, exercises, onSessionAdd, onExerciseUpdate, rpeEn
     draggingKeyRef.current = null;
   };
 
-  const handleTouchMove = (event) => {
+  const handlePointerDown = (slotKey, event) => {
+    setDraggingKey(slotKey);
+    draggingKeyRef.current = slotKey;
+    pointerIdRef.current = event.pointerId;
+    event.currentTarget.setPointerCapture(event.pointerId);
+  };
+
+  const handlePointerMove = (event) => {
+    if (pointerIdRef.current !== event.pointerId) return;
     if (!draggingKeyRef.current) return;
-    const touch = event.touches[0];
-    if (!touch) return;
-    const target = document.elementFromPoint(touch.clientX, touch.clientY);
+    const target = document.elementFromPoint(event.clientX, event.clientY);
     const card = target?.closest?.('[data-slot-key]');
     if (card?.dataset?.slotKey) {
-      touchTargetKeyRef.current = card.dataset.slotKey;
+      reorderWorkoutOrder(draggingKeyRef.current, card.dataset.slotKey);
     }
     event.preventDefault();
   };
 
-  const handleTouchEnd = () => {
-    reorderWorkoutOrder(draggingKeyRef.current, touchTargetKeyRef.current);
+  const handlePointerUp = (event) => {
+    if (pointerIdRef.current !== event.pointerId) return;
     setDraggingKey(null);
     draggingKeyRef.current = null;
-    touchTargetKeyRef.current = null;
+    pointerIdRef.current = null;
   };
 
 
@@ -739,8 +745,6 @@ function LogWorkout({ routines, exercises, onSessionAdd, onExerciseUpdate, rpeEn
                     className="border border-gray-200 dark:border-gray-600 rounded-lg p-4 bg-gray-50 dark:bg-gray-700"
                     onDragOver={handleDragOver}
                     onDrop={() => handleDrop(slotKey)}
-                    onTouchMove={handleTouchMove}
-                    onTouchEnd={handleTouchEnd}
                   >
                     <div className="flex justify-between items-start mb-4">
                       <div className="flex-1">
@@ -751,7 +755,9 @@ function LogWorkout({ routines, exercises, onSessionAdd, onExerciseUpdate, rpeEn
                             aria-label="Drag to reorder"
                             draggable
                             onDragStart={() => handleDragStart(slotKey)}
-                            onTouchStart={() => handleDragStart(slotKey)}
+                            onPointerDown={(event) => handlePointerDown(slotKey, event)}
+                            onPointerMove={handlePointerMove}
+                            onPointerUp={handlePointerUp}
                           >
                             ☰
                           </button>
