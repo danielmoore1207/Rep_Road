@@ -15,6 +15,8 @@ function LogWorkout({ routines, exercises, onSessionAdd, onExerciseUpdate, rpeEn
   const [workoutDate, setWorkoutDate] = useState(getTodayDateString());
   const [workoutOrder, setWorkoutOrder] = useState([]);
   const [draggingKey, setDraggingKey] = useState(null);
+  const draggingKeyRef = useRef(null);
+  const touchTargetKeyRef = useRef(null);
   const [quickMuscleGroup, setQuickMuscleGroup] = useState('');
   const [quickExerciseId, setQuickExerciseId] = useState('');
   const [quickNewExerciseName, setQuickNewExerciseName] = useState('');
@@ -322,38 +324,51 @@ function LogWorkout({ routines, exercises, onSessionAdd, onExerciseUpdate, rpeEn
 
   const handleDragStart = (slotKey) => {
     setDraggingKey(slotKey);
+    draggingKeyRef.current = slotKey;
   };
 
   const handleDragOver = (event) => {
     event.preventDefault();
   };
 
-  const handleDrop = (targetKey) => {
-    if (!draggingKey || draggingKey === targetKey) return;
+  const reorderWorkoutOrder = (fromKey, toKey) => {
+    if (!fromKey || !toKey || fromKey === toKey) return;
     setWorkoutOrder((prev) => {
       const next = [...prev];
-      const fromIndex = next.indexOf(draggingKey);
-      const toIndex = next.indexOf(targetKey);
+      const fromIndex = next.indexOf(fromKey);
+      const toIndex = next.indexOf(toKey);
       if (fromIndex === -1 || toIndex === -1) return prev;
       next.splice(fromIndex, 1);
-      next.splice(toIndex, 0, draggingKey);
+      next.splice(toIndex, 0, fromKey);
       return next;
     });
-    setDraggingKey(null);
   };
 
-  const moveExerciseSlot = (slotKey, direction) => {
-    setWorkoutOrder((prev) => {
-      const next = [...prev];
-      const index = next.indexOf(slotKey);
-      if (index === -1) return prev;
-      const nextIndex = direction === 'up' ? index - 1 : index + 1;
-      if (nextIndex < 0 || nextIndex >= next.length) return prev;
-      const [moved] = next.splice(index, 1);
-      next.splice(nextIndex, 0, moved);
-      return next;
-    });
+  const handleDrop = (targetKey) => {
+    reorderWorkoutOrder(draggingKey, targetKey);
+    setDraggingKey(null);
+    draggingKeyRef.current = null;
   };
+
+  const handleTouchMove = (event) => {
+    if (!draggingKeyRef.current) return;
+    const touch = event.touches[0];
+    if (!touch) return;
+    const target = document.elementFromPoint(touch.clientX, touch.clientY);
+    const card = target?.closest?.('[data-slot-key]');
+    if (card?.dataset?.slotKey) {
+      touchTargetKeyRef.current = card.dataset.slotKey;
+    }
+    event.preventDefault();
+  };
+
+  const handleTouchEnd = () => {
+    reorderWorkoutOrder(draggingKeyRef.current, touchTargetKeyRef.current);
+    setDraggingKey(null);
+    draggingKeyRef.current = null;
+    touchTargetKeyRef.current = null;
+  };
+
 
   const handleReplaceExercise = (slotKey, newExerciseId) => {
     const currentRange = workoutData[slotKey]?.repRange || { min: 8, max: 12 };
@@ -720,40 +735,26 @@ function LogWorkout({ routines, exercises, onSessionAdd, onExerciseUpdate, rpeEn
                 return (
                   <div
                     key={slotKey}
+                    data-slot-key={slotKey}
                     className="border border-gray-200 dark:border-gray-600 rounded-lg p-4 bg-gray-50 dark:bg-gray-700"
                     onDragOver={handleDragOver}
                     onDrop={() => handleDrop(slotKey)}
+                    onTouchMove={handleTouchMove}
+                    onTouchEnd={handleTouchEnd}
                   >
                     <div className="flex justify-between items-start mb-4">
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-1">
                           <button
                             type="button"
-                            className="cursor-move text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
+                            className="cursor-move text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 touch-none"
                             aria-label="Drag to reorder"
                             draggable
                             onDragStart={() => handleDragStart(slotKey)}
+                            onTouchStart={() => handleDragStart(slotKey)}
                           >
                             ☰
                           </button>
-                          <div className="flex flex-col">
-                            <button
-                              type="button"
-                              onClick={() => moveExerciseSlot(slotKey, 'up')}
-                              className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 text-xs leading-none"
-                              aria-label="Move up"
-                            >
-                              ▲
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => moveExerciseSlot(slotKey, 'down')}
-                              className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 text-xs leading-none"
-                              aria-label="Move down"
-                            >
-                              ▼
-                            </button>
-                          </div>
                           <h3 className="text-lg font-bold dark:text-white">{exercise.name}</h3>
                         </div>
                         <p className="text-sm text-gray-600 dark:text-gray-400">
@@ -766,7 +767,10 @@ function LogWorkout({ routines, exercises, onSessionAdd, onExerciseUpdate, rpeEn
                             onChange={(e) => handleReplaceExercise(slotKey, e.target.value)}
                             className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
                           >
-                            {exercises.map((ex) => (
+                            {(exercises.filter((ex) => ex.muscleGroup === exercise.muscleGroup).length
+                              ? exercises.filter((ex) => ex.muscleGroup === exercise.muscleGroup)
+                              : exercises
+                            ).map((ex) => (
                               <option key={ex.id} value={ex.id}>
                                 {ex.name} ({ex.muscleGroup})
                               </option>
