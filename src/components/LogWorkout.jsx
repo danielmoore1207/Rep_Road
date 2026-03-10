@@ -28,6 +28,28 @@ function LogWorkout({ routines, exercises, onSessionAdd, onExerciseUpdate, rpeEn
 
   const isActiveWorkout = logMode === 'quick' || !!selectedRoutine;
 
+  const persistDraft = ({
+    logMode: nextLogMode,
+    selectedRoutine: nextSelectedRoutine,
+    workoutDate: nextWorkoutDate,
+    workoutData: nextWorkoutData,
+    workoutOrder: nextWorkoutOrder,
+    startTime: nextStartTime,
+  } = {}) => {
+    const draftLogMode = nextLogMode ?? logMode;
+    const draftSelectedRoutine = nextSelectedRoutine ?? selectedRoutine;
+    const draftIsActive = draftLogMode === 'quick' || !!draftSelectedRoutine;
+    if (!draftIsActive) return;
+    storage.saveActiveWorkoutDraft({
+      logMode: draftLogMode,
+      selectedRoutine: draftSelectedRoutine,
+      workoutDate: nextWorkoutDate ?? workoutDate,
+      workoutData: nextWorkoutData ?? workoutData,
+      workoutOrder: nextWorkoutOrder ?? workoutOrder,
+      startTime: nextStartTime ?? startTime,
+    });
+  };
+
   const rebuildPredictions = (data) => {
     const next = {};
     Object.keys(data || {}).forEach((slotKey) => {
@@ -202,12 +224,7 @@ function LogWorkout({ routines, exercises, onSessionAdd, onExerciseUpdate, rpeEn
   }, [selectedRoutine, routines, logMode]);
 
   useEffect(() => {
-    if (!isActiveWorkout) {
-      if (hasRestoredDraft.current) {
-        storage.clearActiveWorkoutDraft();
-      }
-      return;
-    }
+    if (!isActiveWorkout) return;
     const draft = {
       logMode,
       selectedRoutine,
@@ -241,7 +258,7 @@ function LogWorkout({ routines, exercises, onSessionAdd, onExerciseUpdate, rpeEn
   };
 
   const handleAddSet = (slotKey) => {
-    setWorkoutData({
+    const nextWorkoutData = {
       ...workoutData,
       [slotKey]: {
         ...workoutData[slotKey],
@@ -250,18 +267,22 @@ function LogWorkout({ routines, exercises, onSessionAdd, onExerciseUpdate, rpeEn
           { weight: '', reps: '', minutes: '', seconds: '', rpe: 8.0 },
         ],
       },
-    });
+    };
+    setWorkoutData(nextWorkoutData);
+    persistDraft({ workoutData: nextWorkoutData });
   };
 
   const handleRemoveSet = (slotKey, index) => {
     if (workoutData[slotKey].sets.length > 1) {
-      setWorkoutData({
+      const nextWorkoutData = {
         ...workoutData,
         [slotKey]: {
           ...workoutData[slotKey],
           sets: workoutData[slotKey].sets.filter((_, i) => i !== index),
         },
-      });
+      };
+      setWorkoutData(nextWorkoutData);
+      persistDraft({ workoutData: nextWorkoutData });
     }
   };
 
@@ -272,19 +293,22 @@ function LogWorkout({ routines, exercises, onSessionAdd, onExerciseUpdate, rpeEn
     } else {
       updatedSets[index][field] = value;
     }
-    setWorkoutData({
+    const nextWorkoutData = {
       ...workoutData,
       [slotKey]: {
         ...workoutData[slotKey],
         sets: updatedSets,
       },
-    });
+    };
+    setWorkoutData(nextWorkoutData);
+    persistDraft({ workoutData: nextWorkoutData });
   };
 
   const handleRemoveExerciseSlot = (slotKey) => {
     setWorkoutData((prev) => {
       const next = { ...prev };
       delete next[slotKey];
+      persistDraft({ workoutData: next });
       return next;
     });
     setPredictions((prev) => {
@@ -292,26 +316,38 @@ function LogWorkout({ routines, exercises, onSessionAdd, onExerciseUpdate, rpeEn
       delete next[slotKey];
       return next;
     });
-    setWorkoutOrder((prev) => prev.filter((key) => key !== slotKey));
+    setWorkoutOrder((prev) => {
+      const next = prev.filter((key) => key !== slotKey);
+      persistDraft({ workoutOrder: next });
+      return next;
+    });
   };
 
   const handleAddExerciseSlot = (exerciseId, repRange = { min: 8, max: 12 }) => {
     const slotKey = `${exerciseId}-${Date.now()}`;
-    setWorkoutData((prev) => ({
-      ...prev,
-      [slotKey]: {
-        exerciseId,
-        sets: Array.from({ length: 3 }, () => ({
-          weight: '',
-          reps: '',
-          minutes: '',
-          seconds: '',
-          rpe: 8.0,
-        })),
-        repRange,
-      },
-    }));
-    setWorkoutOrder((prev) => [...prev, slotKey]);
+    setWorkoutData((prev) => {
+      const next = {
+        ...prev,
+        [slotKey]: {
+          exerciseId,
+          sets: Array.from({ length: 3 }, () => ({
+            weight: '',
+            reps: '',
+            minutes: '',
+            seconds: '',
+            rpe: 8.0,
+          })),
+          repRange,
+        },
+      };
+      persistDraft({ workoutData: next });
+      return next;
+    });
+    setWorkoutOrder((prev) => {
+      const next = [...prev, slotKey];
+      persistDraft({ workoutOrder: next });
+      return next;
+    });
 
     const sessions = storage.getSessions().filter(s => s.exerciseId === exerciseId);
     const pred = predictNextSession(sessions, 'weight');
@@ -340,6 +376,7 @@ function LogWorkout({ routines, exercises, onSessionAdd, onExerciseUpdate, rpeEn
       if (fromIndex === -1 || toIndex === -1) return prev;
       next.splice(fromIndex, 1);
       next.splice(toIndex, 0, fromKey);
+      persistDraft({ workoutOrder: next });
       return next;
     });
   };
@@ -382,7 +419,7 @@ function LogWorkout({ routines, exercises, onSessionAdd, onExerciseUpdate, rpeEn
     setWorkoutData((prev) => {
       const current = prev[slotKey];
       if (!current) return prev;
-      return {
+      const next = {
         ...prev,
         [slotKey]: {
           ...current,
@@ -390,6 +427,8 @@ function LogWorkout({ routines, exercises, onSessionAdd, onExerciseUpdate, rpeEn
           repRange: { ...nextRange },
         },
       };
+      persistDraft({ workoutData: next });
+      return next;
     });
 
     const sessions = storage.getSessions().filter(s => s.exerciseId === newExerciseId);
@@ -590,7 +629,11 @@ function LogWorkout({ routines, exercises, onSessionAdd, onExerciseUpdate, rpeEn
               <input
                 type="date"
                 value={workoutDate}
-                onChange={(e) => setWorkoutDate(e.target.value)}
+                onChange={(e) => {
+                  const nextDate = e.target.value;
+                  setWorkoutDate(nextDate);
+                  persistDraft({ workoutDate: nextDate });
+                }}
                 max={getTodayDateString()}
                 className="w-full max-w-full min-w-0 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
               />
@@ -936,7 +979,6 @@ function LogWorkout({ routines, exercises, onSessionAdd, onExerciseUpdate, rpeEn
                   setQuickExerciseId('');
                   setQuickNewExerciseName('');
                   setQuickCreateMode(false);
-                  storage.clearActiveWorkoutDraft();
                   if (onActiveWorkoutClear) onActiveWorkoutClear();
                 }}
                 className="px-6 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
