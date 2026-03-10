@@ -59,7 +59,8 @@ function LogWorkout({ routines, exercises, onSessionAdd, onExerciseUpdate, rpeEn
       const sessions = storage.getSessions().filter(s => s.exerciseId === slot.exerciseId);
       const pred = predictNextSession(sessions, 'weight');
       const suggestion = suggestWeightIncrease(sessions, repRange);
-      next[slotKey] = { prediction: pred, suggestion };
+      const avgRpe = getRecentAvgRpe(sessions);
+      next[slotKey] = { prediction: pred, suggestion, avgRpe };
     });
     setPredictions(next);
   };
@@ -98,6 +99,17 @@ function LogWorkout({ routines, exercises, onSessionAdd, onExerciseUpdate, rpeEn
 
     const descriptor = repsLeftMap[rpe] || 'Effort';
     return `RPE ${rpe.toFixed(1)} (${descriptor})`;
+  };
+
+  const getRecentAvgRpe = (sessions) => {
+    if (!sessions || sessions.length === 0) return null;
+    const last = sessions[sessions.length - 1];
+    const rpes = (last.sets || [])
+      .map((set) => (typeof set.rpe === 'number' ? set.rpe : null))
+      .filter((value) => value != null);
+    if (rpes.length === 0) return null;
+    const avg = rpes.reduce((sum, value) => sum + value, 0) / rpes.length;
+    return Math.round(avg * 100) / 100;
   };
 
   // Start timer when routine is selected or quick mode starts
@@ -211,7 +223,8 @@ function LogWorkout({ routines, exercises, onSessionAdd, onExerciseUpdate, rpeEn
           const sessions = storage.getSessions().filter(s => s.exerciseId === re.exerciseId);
           const pred = predictNextSession(sessions, 'weight');
           const suggestion = suggestWeightIncrease(sessions, { min: re.repRangeMin, max: re.repRangeMax });
-          preds[slotKey] = { prediction: pred, suggestion };
+          const avgRpe = getRecentAvgRpe(sessions);
+          preds[slotKey] = { prediction: pred, suggestion, avgRpe };
         });
         setPredictions(preds);
       }
@@ -354,7 +367,7 @@ function LogWorkout({ routines, exercises, onSessionAdd, onExerciseUpdate, rpeEn
     const suggestion = suggestWeightIncrease(sessions, repRange);
     setPredictions((prev) => ({
       ...prev,
-      [slotKey]: { prediction: pred, suggestion },
+      [slotKey]: { prediction: pred, suggestion, avgRpe: getRecentAvgRpe(sessions) },
     }));
   };
 
@@ -436,7 +449,7 @@ function LogWorkout({ routines, exercises, onSessionAdd, onExerciseUpdate, rpeEn
     const suggestion = suggestWeightIncrease(sessions, nextRange);
     setPredictions((prev) => ({
       ...prev,
-      [slotKey]: { prediction: pred, suggestion },
+      [slotKey]: { prediction: pred, suggestion, avgRpe: getRecentAvgRpe(sessions) },
     }));
   };
 
@@ -842,7 +855,8 @@ function LogWorkout({ routines, exercises, onSessionAdd, onExerciseUpdate, rpeEn
                             <div className="text-lg font-bold text-blue-600 dark:text-blue-400">
                               {pred.prediction.predictedValue.toFixed(1)} kg
                             </div>
-                            {pred.suggestion.shouldIncrease && (
+                            {pred.suggestion.shouldIncrease &&
+                              (!rpeEnabled || pred.avgRpe == null || pred.avgRpe <= 8.5) && (
                               <div className="text-xs text-green-600 dark:text-green-400 mt-1">
                                 ↑ Increase to {pred.suggestion.suggestedWeight} kg
                               </div>
