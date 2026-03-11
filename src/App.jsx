@@ -12,7 +12,7 @@ function Navigation({ theme }) {
   const location = useLocation();
   
   const navItems = [
-    { path: '/', label: 'Dashboard', icon: '📊' },
+    { path: '/', label: 'Home', icon: '📊' },
     { path: '/routines', label: 'Routines', icon: '🏋️' },
     { path: '/history', label: 'History', icon: '📅' },
     { path: '/profile', label: 'Profile', icon: '👤' },
