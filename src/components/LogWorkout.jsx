@@ -184,6 +184,10 @@ function LogWorkout({ routines, exercises, onSessionAdd, onExerciseUpdate, rpeEn
 
   useEffect(() => {
     if (logMode === 'routine' && selectedRoutine) {
+      if (restoredRoutineRef.current && restoredRoutineRef.current !== selectedRoutine) {
+        restoredDraftPendingRef.current = false;
+        restoredDraftHasDataRef.current = false;
+      }
       const hasDraftForRoutine =
         restoredDraftPendingRef.current &&
         restoredDraftHasDataRef.current &&

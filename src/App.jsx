@@ -49,14 +49,14 @@ function Navigation({ theme }) {
   );
 }
 
-function FloatingActionButton({ onClick }) {
+function FloatingActionButton({ onClick, label = '+' }) {
   return (
     <button
       onClick={onClick}
-      className="fixed bottom-24 right-6 w-14 h-14 bg-black text-red-500 border border-red-600 rounded-full shadow-lg hover:bg-red-900/20 transition-colors flex items-center justify-center text-2xl z-50"
-      aria-label="Log Workout"
+      className={`fixed bottom-24 right-6 ${label === '+' ? 'w-14 h-14 text-2xl' : 'px-4 py-3 text-sm'} bg-black text-red-500 border border-red-600 rounded-full shadow-lg hover:bg-red-900/20 transition-colors flex items-center justify-center z-50`}
+      aria-label={label === '+' ? 'Log Workout' : label}
     >
-      +
+      {label}
     </button>
   );
 }
@@ -396,7 +396,10 @@ function AppContent({
         </div>
       )}
       {location.pathname !== '/log-workout' && (
-        <FloatingActionButton onClick={() => navigate('/log-workout')} />
+        <FloatingActionButton
+          onClick={() => navigate('/log-workout')}
+          label={activeWorkout ? 'Resume Workout' : '+'}
+        />
       )}
     </div>
   );
