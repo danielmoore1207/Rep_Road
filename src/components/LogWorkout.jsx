@@ -169,19 +169,24 @@ function LogWorkout({ routines, exercises, onSessionAdd, onExerciseUpdate, rpeEn
         setElapsedSeconds(baseElapsed);
       }
       rebuildPredictions(draft.workoutData || {});
+      previousRoutineRef.current = draft.selectedRoutine || '';
     }
     hasRestoredDraft.current = true;
   }, [exercises]);
 
   useEffect(() => {
+    if (restoredDraftPendingRef.current && Object.keys(workoutData).length > 0) {
+      restoredDraftPendingRef.current = false;
+    }
+  }, [workoutData]);
+
+  useEffect(() => {
     if (logMode === 'routine' && selectedRoutine) {
       const hasDraftForRoutine =
         restoredDraftPendingRef.current &&
-        restoredRoutineRef.current === selectedRoutine &&
-        Object.keys(workoutData).length > 0;
+        restoredRoutineRef.current === selectedRoutine;
 
       if (hasDraftForRoutine) {
-        restoredDraftPendingRef.current = false;
         previousRoutineRef.current = selectedRoutine;
         return;
       }
@@ -994,6 +999,8 @@ function LogWorkout({ routines, exercises, onSessionAdd, onExerciseUpdate, rpeEn
                   setQuickExerciseId('');
                   setQuickNewExerciseName('');
                   setQuickCreateMode(false);
+                  storage.clearActiveWorkoutDraft();
+                  if (onActiveWorkoutClear) onActiveWorkoutClear();
                 }}
                 className="px-6 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
               >
