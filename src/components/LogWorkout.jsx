@@ -251,7 +251,8 @@ function LogWorkout({ routines, exercises, onSessionAdd, onExerciseUpdate, rpeEn
 
   useEffect(() => {
     if (!isActiveWorkout) {
-      if (onActiveWorkoutClear) onActiveWorkoutClear();
+      const existingDraft = storage.getActiveWorkoutDraft();
+      if (!existingDraft && onActiveWorkoutClear) onActiveWorkoutClear();
       return;
     }
     if (!onActiveWorkoutChange) return;
@@ -993,7 +994,6 @@ function LogWorkout({ routines, exercises, onSessionAdd, onExerciseUpdate, rpeEn
                   setQuickExerciseId('');
                   setQuickNewExerciseName('');
                   setQuickCreateMode(false);
-                  if (onActiveWorkoutClear) onActiveWorkoutClear();
                 }}
                 className="px-6 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
               >

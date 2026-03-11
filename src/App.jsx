@@ -189,7 +189,6 @@ function App() {
   const handleActiveWorkoutClear = () => {
     setActiveWorkout(null);
     storage.clearActiveWorkout();
-    storage.clearActiveWorkoutDraft();
   };
 
   return (
