@@ -162,7 +162,7 @@ function LogWorkout({ routines, exercises, onSessionAdd, onExerciseUpdate, rpeEn
       setWorkoutData(draft.workoutData || {});
       setWorkoutOrder(draft.workoutOrder || Object.keys(draft.workoutData || {}));
       restoredRoutineRef.current = draft.selectedRoutine || '';
-      restoredDraftPendingRef.current = true;
+      restoredDraftPendingRef.current = Object.keys(draft.workoutData || {}).length > 0;
       if (draft.startTime) {
         setStartTime(draft.startTime);
         const baseElapsed = Math.max(0, Math.floor((Date.now() - draft.startTime) / 1000));
@@ -184,7 +184,8 @@ function LogWorkout({ routines, exercises, onSessionAdd, onExerciseUpdate, rpeEn
     if (logMode === 'routine' && selectedRoutine) {
       const hasDraftForRoutine =
         restoredDraftPendingRef.current &&
-        restoredRoutineRef.current === selectedRoutine;
+        restoredRoutineRef.current === selectedRoutine &&
+        Object.keys(workoutData).length > 0;
 
       if (hasDraftForRoutine) {
         previousRoutineRef.current = selectedRoutine;
