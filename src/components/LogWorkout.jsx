@@ -24,6 +24,7 @@ function LogWorkout({ routines, exercises, onSessionAdd, onExerciseUpdate, rpeEn
   const hasRestoredDraft = useRef(false);
   const restoredRoutineRef = useRef('');
   const restoredDraftPendingRef = useRef(false);
+  const restoredDraftHasDataRef = useRef(false);
   const previousRoutineRef = useRef('');
 
   const isActiveWorkout = logMode === 'quick' || !!selectedRoutine;
@@ -162,7 +163,8 @@ function LogWorkout({ routines, exercises, onSessionAdd, onExerciseUpdate, rpeEn
       setWorkoutData(draft.workoutData || {});
       setWorkoutOrder(draft.workoutOrder || Object.keys(draft.workoutData || {}));
       restoredRoutineRef.current = draft.selectedRoutine || '';
-      restoredDraftPendingRef.current = Object.keys(draft.workoutData || {}).length > 0;
+      restoredDraftHasDataRef.current = Object.keys(draft.workoutData || {}).length > 0;
+      restoredDraftPendingRef.current = restoredDraftHasDataRef.current;
       if (draft.startTime) {
         setStartTime(draft.startTime);
         const baseElapsed = Math.max(0, Math.floor((Date.now() - draft.startTime) / 1000));
@@ -184,8 +186,8 @@ function LogWorkout({ routines, exercises, onSessionAdd, onExerciseUpdate, rpeEn
     if (logMode === 'routine' && selectedRoutine) {
       const hasDraftForRoutine =
         restoredDraftPendingRef.current &&
-        restoredRoutineRef.current === selectedRoutine &&
-        Object.keys(workoutData).length > 0;
+        restoredDraftHasDataRef.current &&
+        restoredRoutineRef.current === selectedRoutine;
 
       if (hasDraftForRoutine) {
         previousRoutineRef.current = selectedRoutine;
