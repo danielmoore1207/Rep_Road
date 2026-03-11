@@ -183,6 +183,14 @@ function LogWorkout({ routines, exercises, onSessionAdd, onExerciseUpdate, rpeEn
   }, [workoutData]);
 
   useEffect(() => {
+    if (workoutOrder.length === 0 && Object.keys(workoutData).length > 0) {
+      const nextOrder = Object.keys(workoutData);
+      setWorkoutOrder(nextOrder);
+      persistDraft({ workoutOrder: nextOrder });
+    }
+  }, [workoutData, workoutOrder.length]);
+
+  useEffect(() => {
     if (logMode === 'routine' && selectedRoutine) {
       if (restoredRoutineRef.current && restoredRoutineRef.current !== selectedRoutine) {
         restoredDraftPendingRef.current = false;
