@@ -203,7 +203,7 @@ function Dashboard({ exercises, sessions, routines, growthSettings, oneRmUnit })
         }
       }
       
-      const suggestion = suggestWeightIncrease(exerciseSessions, repRange);
+      const suggestion = suggestWeightIncrease(exerciseSessions, repRange, growthSettings?.progressionMode || 'moderate');
       const growth = exerciseSessions.length >= 2 
         ? trackGrowth(exerciseSessions, prediction) 
         : null;

@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { predictNextSession, suggestWeightIncrease } from '../utils/predictions';
 import { storage } from '../utils/storage';
 
-function LogWorkout({ routines, exercises, onSessionAdd, onExerciseUpdate, rpeEnabled, onActiveWorkoutChange, onActiveWorkoutClear }) {
+function LogWorkout({ routines, exercises, growthSettings, onSessionAdd, onExerciseUpdate, rpeEnabled, onActiveWorkoutChange, onActiveWorkoutClear }) {
   const getTodayDateString = () => new Date().toISOString().slice(0, 10);
 
   const [selectedRoutine, setSelectedRoutine] = useState('');
@@ -64,7 +64,7 @@ function LogWorkout({ routines, exercises, onSessionAdd, onExerciseUpdate, rpeEn
       const repRange = slot.repRange || { min: 8, max: 12 };
       const sessions = storage.getSessions().filter(s => s.exerciseId === slot.exerciseId);
       const pred = predictNextSession(sessions, 'weight');
-      const suggestion = suggestWeightIncrease(sessions, repRange);
+      const suggestion = suggestWeightIncrease(sessions, repRange, growthSettings?.progressionMode || 'moderate');
       const avgRpe = getRecentAvgRpe(sessions);
       next[slotKey] = { prediction: pred, suggestion, avgRpe };
     });
@@ -150,7 +150,7 @@ function LogWorkout({ routines, exercises, onSessionAdd, onExerciseUpdate, rpeEn
     });
 
     const pred = predictions[slotKey];
-    const suggestedWeight = pred?.prediction?.predictedValue ?? null;
+    const suggestedWeight = pred?.suggestion?.suggestedWeight ?? null;
 
     let reasoning = pred?.suggestion?.reason || 'No recommendation reason available yet.';
     if (suggestedWeight != null && topSet) {
@@ -310,7 +310,7 @@ function LogWorkout({ routines, exercises, onSessionAdd, onExerciseUpdate, rpeEn
           const slotKey = `${re.exerciseId}-${idx}`;
           const sessions = storage.getSessions().filter(s => s.exerciseId === re.exerciseId);
           const pred = predictNextSession(sessions, 'weight');
-          const suggestion = suggestWeightIncrease(sessions, { min: re.repRangeMin, max: re.repRangeMax });
+          const suggestion = suggestWeightIncrease(sessions, { min: re.repRangeMin, max: re.repRangeMax }, growthSettings?.progressionMode || 'moderate');
           const avgRpe = getRecentAvgRpe(sessions);
           preds[slotKey] = { prediction: pred, suggestion, avgRpe };
         });
@@ -453,7 +453,7 @@ function LogWorkout({ routines, exercises, onSessionAdd, onExerciseUpdate, rpeEn
 
     const sessions = storage.getSessions().filter(s => s.exerciseId === exerciseId);
     const pred = predictNextSession(sessions, 'weight');
-    const suggestion = suggestWeightIncrease(sessions, repRange);
+    const suggestion = suggestWeightIncrease(sessions, repRange, growthSettings?.progressionMode || 'moderate');
     setPredictions((prev) => ({
       ...prev,
       [slotKey]: { prediction: pred, suggestion, avgRpe: getRecentAvgRpe(sessions) },
@@ -545,7 +545,7 @@ function LogWorkout({ routines, exercises, onSessionAdd, onExerciseUpdate, rpeEn
 
     const sessions = storage.getSessions().filter(s => s.exerciseId === newExerciseId);
     const pred = predictNextSession(sessions, 'weight');
-    const suggestion = suggestWeightIncrease(sessions, nextRange);
+    const suggestion = suggestWeightIncrease(sessions, nextRange, growthSettings?.progressionMode || 'moderate');
     setPredictions((prev) => ({
       ...prev,
       [slotKey]: { prediction: pred, suggestion, avgRpe: getRecentAvgRpe(sessions) },
@@ -1040,7 +1040,7 @@ function LogWorkout({ routines, exercises, onSessionAdd, onExerciseUpdate, rpeEn
                           <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-2 text-sm">
                             <div className="text-xs text-gray-600 dark:text-gray-400">Suggested Weight</div>
                             <div className="text-lg font-bold text-blue-600 dark:text-blue-400">
-                              {pred.prediction.predictedValue.toFixed(1)} kg
+                              {(pred.suggestion?.suggestedWeight ?? 0).toFixed(2)} kg
                             </div>
                             {pred.suggestion.shouldIncrease &&
                               (!rpeEnabled || pred.avgRpe == null || pred.avgRpe <= 8.5) && (

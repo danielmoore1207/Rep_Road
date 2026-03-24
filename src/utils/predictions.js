@@ -124,8 +124,8 @@ function calculateVariance(values) {
  * @param {Object} desiredRepRange - {min: number, max: number} from routine
  * @returns {Object} - Suggestion data
  */
-export function suggestWeightIncrease(sessions, desiredRepRange = null) {
-  if (!sessions || sessions.length < 2) {
+export function suggestWeightIncrease(sessions, desiredRepRange = null, progressionMode = 'moderate') {
+  if (!sessions || sessions.length === 0) {
     return {
       shouldIncrease: false,
       suggestedWeight: null,
@@ -133,64 +133,100 @@ export function suggestWeightIncrease(sessions, desiredRepRange = null) {
     };
   }
 
-  const recentSessions = sessions.slice(-3); // Last 3 sessions
-  const weights = recentSessions.map(s => Math.max(...s.sets.map(set => set.weight || 0)));
-  const reps = recentSessions.map(s => {
-    const avgReps = s.sets.reduce((sum, set) => sum + (set.reps || 0), 0) / s.sets.length;
-    return avgReps;
-  });
+  const modeConfig = getProgressionModeConfig(progressionMode);
+  const orderedSessions = [...sessions].sort((a, b) => new Date(a.date) - new Date(b.date));
+  const recentSessions = orderedSessions.slice(-modeConfig.smoothingWindow);
 
-  const currentWeight = weights[weights.length - 1];
-  const currentReps = reps[reps.length - 1];
-  const avgReps = reps.reduce((a, b) => a + b, 0) / reps.length;
+  const targetRepRange = desiredRepRange || { min: 8, max: 12 };
+  const targetReps = (targetRepRange.min + targetRepRange.max) / 2;
+  const targetRpe = modeConfig.targetRpe;
 
-  // Use desired rep range from routine if available, otherwise default to 8
-  const targetRepsMin = desiredRepRange?.min || 8;
-  const targetRepsMax = desiredRepRange?.max || 12;
-  const targetReps = (targetRepsMin + targetRepsMax) / 2; // Use midpoint as target
-  
-  // Check if user is consistently hitting target reps (within range or at upper end)
-  const isConsistent = reps.every(r => r >= targetRepsMin * 0.9); // Within 10% of min target
-  const isHittingUpperRange = avgReps >= targetRepsMax * 0.95; // Hitting upper end of range
-  
-  // Check if reps are increasing
-  const repsIncreasing = reps.length >= 2 && reps[reps.length - 1] > reps[reps.length - 2];
+  const sessionBestE1Rms = recentSessions
+    .map((session) => {
+      const best = (session.sets || []).reduce((acc, set) => {
+        const value = calculateSetE1RM(set);
+        return value > acc ? value : acc;
+      }, 0);
+      return best > 0 ? best : null;
+    })
+    .filter((value) => value != null);
 
-  let shouldIncrease = false;
-  let suggestedWeight = currentWeight;
-  let reason = '';
-
-  // If hitting upper end of desired range consistently, suggest increase
-  if (isHittingUpperRange && isConsistent) {
-    shouldIncrease = true;
-    suggestedWeight = currentWeight + 2.5; // Suggest 2.5kg increase (or 5lbs)
-    reason = `Consistently hitting upper range (${Math.round(avgReps)} reps). Ready to progress!`;
-  } else if (isConsistent && avgReps >= targetReps) {
-    shouldIncrease = true;
-    suggestedWeight = currentWeight + 2.5;
-    reason = `Consistently hitting target (${Math.round(avgReps)} reps). Ready to progress!`;
-  } else if (repsIncreasing && currentReps >= targetRepsMax) {
-    shouldIncrease = true;
-    suggestedWeight = currentWeight + 2.5;
-    reason = `Reps are increasing and hitting upper range (${Math.round(currentReps)} reps). Time to increase weight.`;
-  } else if (avgReps < targetRepsMin * 0.8) {
-    shouldIncrease = false;
-    suggestedWeight = currentWeight;
-    reason = `Reps are low (${Math.round(avgReps)} avg). Maintain current weight. Aim for ${targetRepsMin}-${targetRepsMax} reps.`;
-  } else {
-    shouldIncrease = false;
-    suggestedWeight = currentWeight;
-    reason = `Keep working at current weight. Aim for ${targetRepsMin}-${targetRepsMax} reps consistently.`;
+  if (sessionBestE1Rms.length === 0) {
+    return {
+      shouldIncrease: false,
+      suggestedWeight: null,
+      reason: 'No valid sets found to estimate e1RM.',
+    };
   }
+
+  const smoothedE1RM = weightedMovingAverage(sessionBestE1Rms);
+  const targetPercent = getBrzyckiPercentForRepsAndRpe(targetReps, targetRpe);
+  const rawSuggestedWeight = smoothedE1RM * targetPercent;
+  const suggestedWeight = roundToNearest(rawSuggestedWeight, 1.25);
+
+  const lastSession = orderedSessions[orderedSessions.length - 1];
+  const currentWeight = Math.max(...(lastSession?.sets || []).map((set) => set.weight || 0), 0);
+  const shouldIncrease = suggestedWeight > currentWeight;
+  const reason = `Using ${modeConfig.label} mode (RPE ${targetRpe.toFixed(1)}, ${modeConfig.smoothingWindow}-session smoothing), your recent weighted e1RM is ${smoothedE1RM.toFixed(1)}kg. Targeting ${targetReps.toFixed(1)} reps gives ${(targetPercent * 100).toFixed(1)}% intensity, which suggests ${suggestedWeight.toFixed(2)}kg (rounded to nearest 1.25kg).`;
 
   return {
     shouldIncrease,
-    suggestedWeight: Math.round(suggestedWeight * 100) / 100,
+    suggestedWeight,
     currentWeight,
-    currentReps: Math.round(currentReps * 100) / 100,
+    currentReps: Math.round((lastSession?.sets?.reduce((sum, set) => sum + (set.reps || 0), 0) / Math.max(1, lastSession?.sets?.length || 1)) * 100) / 100,
     reason,
-    targetRepRange: desiredRepRange || { min: 8, max: 12 },
+    targetRepRange,
+    progressionMode: modeConfig.mode,
+    smoothedE1RM: Math.round(smoothedE1RM * 100) / 100,
+    targetRpe,
+    targetPercent: Math.round(targetPercent * 1000) / 1000,
   };
+}
+
+function getProgressionModeConfig(mode) {
+  switch (mode) {
+    case 'conservative':
+      return { mode: 'conservative', label: 'Conservative', targetRpe: 8.0, smoothingWindow: 5 };
+    case 'aggressive':
+      return { mode: 'aggressive', label: 'Aggressive', targetRpe: 9.0, smoothingWindow: 3 };
+    case 'moderate':
+    default:
+      return { mode: 'moderate', label: 'Moderate', targetRpe: 8.5, smoothingWindow: 4 };
+  }
+}
+
+function roundToNearest(value, increment) {
+  if (!Number.isFinite(value) || increment <= 0) return 0;
+  return Math.round(value / increment) * increment;
+}
+
+function weightedMovingAverage(values) {
+  if (!values.length) return 0;
+  let weightedSum = 0;
+  let totalWeight = 0;
+  values.forEach((value, index) => {
+    const weight = index + 1; // More recent sessions have higher weight
+    weightedSum += value * weight;
+    totalWeight += weight;
+  });
+  return weightedSum / totalWeight;
+}
+
+function calculateSetE1RM(set) {
+  const weight = Number(set?.weight) || 0;
+  const reps = Number(set?.reps) || 0;
+  if (weight <= 0 || reps <= 0) return 0;
+  const percent = getBrzyckiPercentForRepsAndRpe(reps, set?.rpe);
+  if (percent <= 0) return 0;
+  return weight / percent;
+}
+
+function getBrzyckiPercentForRepsAndRpe(reps, rpe) {
+  const repsNum = Math.max(1, Number(reps) || 1);
+  const rpeNum = Number.isFinite(Number(rpe)) ? Number(rpe) : 8.5;
+  const rir = Math.max(0, Math.min(5, 10 - rpeNum));
+  const repsAtFailure = Math.max(1, Math.min(36, repsNum + rir));
+  return Math.max(0.01, (37 - repsAtFailure) / 36);
 }
 
 /**

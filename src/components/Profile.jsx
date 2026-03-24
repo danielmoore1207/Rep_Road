@@ -10,6 +10,7 @@ function Profile({ user, onUserUpdate, theme, onThemeChange, rpeEnabled, onRpeEn
   const [showSignIn, setShowSignIn] = useState(!user);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [localGrowthSettings, setLocalGrowthSettings] = useState(growthSettings);
+  const [showProgressionInfo, setShowProgressionInfo] = useState(false);
 
   const handleSignIn = (e) => {
     e.preventDefault();
@@ -270,6 +271,64 @@ function Profile({ user, onUserUpdate, theme, onThemeChange, rpeEnabled, onRpeEn
                   ))}
                 </div>
               </div>
+            </div>
+          </div>
+
+          <div className="pt-2 border-t border-gray-200 dark:border-gray-700">
+            <div className="flex items-center justify-between mb-3">
+              <h4 className="text-lg font-semibold">Progression Mode</h4>
+              <button
+                type="button"
+                onClick={() => setShowProgressionInfo((prev) => !prev)}
+                className="w-8 h-8 rounded-full border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
+                aria-label="Progression mode info"
+              >
+                i
+              </button>
+            </div>
+
+            {showProgressionInfo && (
+              <div className="mb-3 text-xs text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg p-3 space-y-1">
+                <div><strong>Conservative:</strong> slower increases, targets lower effort (RPE 8.0) with 5-session smoothing.</div>
+                <div><strong>Moderate:</strong> balanced progression (RPE 8.5) with 4-session smoothing.</div>
+                <div><strong>Aggressive:</strong> faster increases, higher effort target (RPE 9.0) with 3-session smoothing.</div>
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <button
+                type="button"
+                onClick={() => handleGrowthSettingUpdate({ progressionMode: 'conservative' })}
+                className={`px-4 py-3 rounded-lg border-2 transition-colors ${
+                  (localGrowthSettings?.progressionMode || 'moderate') === 'conservative'
+                    ? 'border-blue-600 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400'
+                    : 'border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500'
+                }`}
+              >
+                Conservative
+              </button>
+              <button
+                type="button"
+                onClick={() => handleGrowthSettingUpdate({ progressionMode: 'moderate' })}
+                className={`px-4 py-3 rounded-lg border-2 transition-colors ${
+                  (localGrowthSettings?.progressionMode || 'moderate') === 'moderate'
+                    ? 'border-blue-600 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400'
+                    : 'border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500'
+                }`}
+              >
+                Moderate
+              </button>
+              <button
+                type="button"
+                onClick={() => handleGrowthSettingUpdate({ progressionMode: 'aggressive' })}
+                className={`px-4 py-3 rounded-lg border-2 transition-colors ${
+                  (localGrowthSettings?.progressionMode || 'moderate') === 'aggressive'
+                    ? 'border-blue-600 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400'
+                    : 'border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500'
+                }`}
+              >
+                Aggressive
+              </button>
             </div>
           </div>
 

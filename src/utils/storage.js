@@ -109,6 +109,7 @@ export const storage = {
           weightedAverage: true,
           includeAccessories: true,
           formula: 'epley',
+          progressionMode: 'moderate',
           benchmarks: [
             { name: 'Squat', weight: 0.4 },
             { name: 'Bench', weight: 0.3 },

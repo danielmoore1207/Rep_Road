@@ -309,6 +309,7 @@ function AppContent({
               <LogWorkout 
                 exercises={exercises}
                 routines={routines}
+                growthSettings={growthSettings}
                 onSessionAdd={onSessionAdd}
                 onExerciseUpdate={onExerciseUpdate}
                 rpeEnabled={rpeEnabled}
