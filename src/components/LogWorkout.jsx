@@ -26,6 +26,7 @@ function LogWorkout({ routines, exercises, onSessionAdd, onExerciseUpdate, rpeEn
   const restoredDraftPendingRef = useRef(false);
   const restoredDraftHasDataRef = useRef(false);
   const previousRoutineRef = useRef('');
+  const isRestoringDraftRef = useRef(false);
 
   const isActiveWorkout = logMode === 'quick' || !!selectedRoutine;
 
@@ -157,6 +158,7 @@ function LogWorkout({ routines, exercises, onSessionAdd, onExerciseUpdate, rpeEn
     if (hasRestoredDraft.current) return;
     const draft = storage.getActiveWorkoutDraft();
     if (draft) {
+      isRestoringDraftRef.current = true;
       setLogMode(draft.logMode || 'routine');
       setSelectedRoutine(draft.selectedRoutine || '');
       setWorkoutDate(draft.workoutDate || getTodayDateString());
@@ -177,6 +179,12 @@ function LogWorkout({ routines, exercises, onSessionAdd, onExerciseUpdate, rpeEn
   }, [exercises]);
 
   useEffect(() => {
+    if (!isRestoringDraftRef.current) return;
+    if (logMode === 'routine' && !selectedRoutine) return;
+    isRestoringDraftRef.current = false;
+  }, [logMode, selectedRoutine, workoutData]);
+
+  useEffect(() => {
     if (restoredDraftPendingRef.current && Object.keys(workoutData).length > 0) {
       restoredDraftPendingRef.current = false;
     }
@@ -191,6 +199,7 @@ function LogWorkout({ routines, exercises, onSessionAdd, onExerciseUpdate, rpeEn
   }, [workoutData, workoutOrder.length]);
 
   useEffect(() => {
+    if (isRestoringDraftRef.current) return;
     if (logMode === 'routine' && selectedRoutine) {
       if (restoredRoutineRef.current && restoredRoutineRef.current !== selectedRoutine) {
         restoredDraftPendingRef.current = false;
@@ -257,7 +266,7 @@ function LogWorkout({ routines, exercises, onSessionAdd, onExerciseUpdate, rpeEn
   }, [selectedRoutine, routines, logMode]);
 
   useEffect(() => {
-    if (!isActiveWorkout) return;
+    if (!isActiveWorkout || isRestoringDraftRef.current) return;
     const draft = {
       logMode,
       selectedRoutine,
