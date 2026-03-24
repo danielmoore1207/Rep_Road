@@ -24,6 +24,9 @@ function LogWorkout({ routines, exercises, growthSettings, onSessionAdd, onExerc
   const [quickMuscleGroup, setQuickMuscleGroup] = useState('');
   const [quickExerciseId, setQuickExerciseId] = useState('');
   const [quickNewExerciseName, setQuickNewExerciseName] = useState('');
+  const [routineAddMuscleGroup, setRoutineAddMuscleGroup] = useState('');
+  const [routineAddExerciseId, setRoutineAddExerciseId] = useState('');
+  const [showRoutineAddForm, setShowRoutineAddForm] = useState(false);
   const [quickCreateMode, setQuickCreateMode] = useState(false);
   const hasRestoredDraft = useRef(false);
   const restoredRoutineRef = useRef('');
@@ -131,6 +134,8 @@ function LogWorkout({ routines, exercises, growthSettings, onSessionAdd, onExerc
       .sort((a, b) => new Date(b.date) - new Date(a.date));
 
     const lastSession = sessions[0] || null;
+    const previousNoteSession = sessions.find((session) => typeof session.note === 'string' && session.note.trim());
+    const previousNote = previousNoteSession?.note?.trim() || '';
     let topSet = null;
 
     sessions.forEach((session) => {
@@ -167,6 +172,7 @@ function LogWorkout({ routines, exercises, growthSettings, onSessionAdd, onExerc
       exercise,
       repRange,
       lastSession,
+      previousNote,
       topSet,
       suggestedWeight,
       reasoning,
@@ -291,6 +297,7 @@ function LogWorkout({ routines, exercises, growthSettings, onSessionAdd, onExerc
           const slotKey = `${re.exerciseId}-${idx}`;
           initialData[slotKey] = {
             exerciseId: re.exerciseId,
+            notes: '',
             sets: Array.from({ length: setsCount }, () => ({
               weight: '',
               reps: '',
@@ -406,6 +413,18 @@ function LogWorkout({ routines, exercises, growthSettings, onSessionAdd, onExerc
     persistDraft({ workoutData: nextWorkoutData });
   };
 
+  const handleNotesChange = (slotKey, value) => {
+    const nextWorkoutData = {
+      ...workoutData,
+      [slotKey]: {
+        ...workoutData[slotKey],
+        notes: value,
+      },
+    };
+    setWorkoutData(nextWorkoutData);
+    persistDraft({ workoutData: nextWorkoutData });
+  };
+
   const handleRemoveExerciseSlot = (slotKey) => {
     setWorkoutData((prev) => {
       const next = { ...prev };
@@ -432,6 +451,7 @@ function LogWorkout({ routines, exercises, growthSettings, onSessionAdd, onExerc
         ...prev,
         [slotKey]: {
           exerciseId,
+          notes: '',
           sets: Array.from({ length: 3 }, () => ({
             weight: '',
             reps: '',
@@ -614,6 +634,7 @@ function LogWorkout({ routines, exercises, growthSettings, onSessionAdd, onExerc
         routineName: routine.name,
         durationMinutes, // Same duration for all exercises in this workout
         date: sessionDate,
+        note: (data.notes || '').trim(),
         sets: data.sets
           .filter(set => {
             if (exercise?.muscleGroup === 'Cardio') {
@@ -658,6 +679,9 @@ function LogWorkout({ routines, exercises, growthSettings, onSessionAdd, onExerc
     setQuickExerciseId('');
     setQuickNewExerciseName('');
     setQuickCreateMode(false);
+    setRoutineAddMuscleGroup('');
+    setRoutineAddExerciseId('');
+    setShowRoutineAddForm(false);
     setReplacingSlotKey(null);
     setOpenMenuSlotKey(null);
     setShowShuffleForm(false);
@@ -671,6 +695,9 @@ function LogWorkout({ routines, exercises, growthSettings, onSessionAdd, onExerc
   const filteredQuickExercises = quickMuscleGroup
     ? exercises.filter((ex) => ex.muscleGroup === quickMuscleGroup)
     : exercises;
+  const filteredRoutineAddExercises = routineAddMuscleGroup
+    ? exercises.filter((ex) => ex.muscleGroup === routineAddMuscleGroup)
+    : [];
   const infoData = infoSlotKey ? getExerciseInfo(infoSlotKey) : null;
 
   return (
@@ -680,64 +707,74 @@ function LogWorkout({ routines, exercises, growthSettings, onSessionAdd, onExerc
 
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
         <form onSubmit={handleFinishWorkout} className="space-y-6">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Log Mode
-            </label>
-            <div className="flex space-x-4">
-              <button
-                type="button"
-                onClick={() => {
-                  setLogMode('routine');
-                  setQuickCreateMode(false);
-                }}
-                className={`flex-1 px-4 py-3 rounded-lg border-2 transition-colors ${
-                  logMode === 'routine'
-                    ? 'border-blue-600 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400'
-                    : 'border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500 text-white'
-                }`}
-              >
-                Use Routine
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setLogMode('quick');
-                  setSelectedRoutine('');
-                  setWorkoutData({});
-                  setPredictions({});
-                  setWorkoutOrder([]);
-                }}
-                className={`flex-1 px-4 py-3 rounded-lg border-2 transition-colors ${
-                  logMode === 'quick'
-                    ? 'border-blue-600 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400'
-                    : 'border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500 text-white'
-                }`}
-              >
-                Quick Log
-              </button>
-            </div>
-          </div>
+          {!(logMode === 'routine' && selectedRoutine) && (
+            <>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Log Mode
+                </label>
+                <div className="flex space-x-4">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setLogMode('routine');
+                      setQuickCreateMode(false);
+                      setRoutineAddMuscleGroup('');
+                      setRoutineAddExerciseId('');
+                      setShowRoutineAddForm(false);
+                    }}
+                    className={`flex-1 px-4 py-3 rounded-lg border-2 transition-colors ${
+                      logMode === 'routine'
+                        ? 'border-blue-600 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400'
+                        : 'border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500 text-white'
+                    }`}
+                  >
+                    Use Routine
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setLogMode('quick');
+                      setSelectedRoutine('');
+                      setWorkoutData({});
+                      setPredictions({});
+                      setWorkoutOrder([]);
+                      setRoutineAddMuscleGroup('');
+                      setRoutineAddExerciseId('');
+                      setShowRoutineAddForm(false);
+                    }}
+                    className={`flex-1 px-4 py-3 rounded-lg border-2 transition-colors ${
+                      logMode === 'quick'
+                        ? 'border-blue-600 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400'
+                        : 'border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500 text-white'
+                    }`}
+                  >
+                    Quick Log
+                  </button>
+                </div>
+              </div>
 
-          {logMode === 'routine' && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Select Routine *
-              </label>
-              <select
-                value={selectedRoutine}
-                onChange={(e) => setSelectedRoutine(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                required
-              >
-                <option value="">Choose a routine...</option>
-                {routines.map(routine => (
-                  <option key={routine.id} value={routine.id}>
-                    {routine.name} ({routine.exercises.length} exercises)
-                  </option>
-                ))}
-              </select>
-            </div>
+              {logMode === 'routine' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Select Routine *
+                  </label>
+                  <select
+                    value={selectedRoutine}
+                    onChange={(e) => setSelectedRoutine(e.target.value)}
+                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    required
+                  >
+                    <option value="">Choose a routine...</option>
+                    {routines.map(routine => (
+                      <option key={routine.id} value={routine.id}>
+                        {routine.name} ({routine.exercises.length} exercises)
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+            </>
           )}
 
           {/* Workout Date */}
@@ -1057,6 +1094,19 @@ function LogWorkout({ routines, exercises, growthSettings, onSessionAdd, onExerc
                       </div>
                     </div>
 
+                    <div className="mb-4">
+                      <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">
+                        Notes for Next Session
+                      </label>
+                      <textarea
+                        value={data.notes ?? ''}
+                        onChange={(e) => handleNotesChange(slotKey, e.target.value)}
+                        rows={2}
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm resize-none"
+                        placeholder="e.g. last set felt heavy, rest 3 min next time"
+                      />
+                    </div>
+
                     <div>
                       <div className="flex justify-between items-center mb-3">
                         <label className="block text-sm font-medium text-gray-700">
@@ -1169,6 +1219,86 @@ function LogWorkout({ routines, exercises, growthSettings, onSessionAdd, onExerc
             </div>
           )}
 
+          {logMode === 'routine' && isActiveWorkout && (
+            <div className="bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg p-4 space-y-4">
+              {!showRoutineAddForm ? (
+                <button
+                  type="button"
+                  onClick={() => setShowRoutineAddForm(true)}
+                  className="w-full py-2 border border-dashed border-blue-400 text-blue-600 dark:text-blue-400 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/10 transition-colors text-sm font-medium"
+                >
+                  + Add Exercise
+                </button>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Muscle Group
+                    </label>
+                    <select
+                      value={routineAddMuscleGroup}
+                      onChange={(e) => {
+                        setRoutineAddMuscleGroup(e.target.value);
+                        setRoutineAddExerciseId('');
+                      }}
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    >
+                      <option value="">Select muscle group...</option>
+                      {[...new Set(exercises.map((ex) => ex.muscleGroup).filter(Boolean))].map((group) => (
+                        <option key={group} value={group}>{group}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Exercise
+                    </label>
+                    <select
+                      value={routineAddExerciseId}
+                      onChange={(e) => setRoutineAddExerciseId(e.target.value)}
+                      disabled={!routineAddMuscleGroup}
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white disabled:opacity-60"
+                    >
+                      <option value="">Select exercise...</option>
+                      {filteredRoutineAddExercises.map((ex) => (
+                        <option key={ex.id} value={ex.id}>
+                          {ex.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="flex items-end gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (!routineAddExerciseId) return;
+                        const repRange = getRepRangeForExercise(routineAddExerciseId, { min: 8, max: 12 });
+                        handleAddExerciseSlot(routineAddExerciseId, repRange);
+                        setRoutineAddExerciseId('');
+                        setRoutineAddMuscleGroup('');
+                        setShowRoutineAddForm(false);
+                      }}
+                      className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                    >
+                      Add
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowRoutineAddForm(false);
+                        setRoutineAddMuscleGroup('');
+                        setRoutineAddExerciseId('');
+                      }}
+                      className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
           {isActiveWorkout && (
             <div className="flex justify-end space-x-3 pt-4 border-t">
               <button
@@ -1183,6 +1313,9 @@ function LogWorkout({ routines, exercises, growthSettings, onSessionAdd, onExerc
                   setQuickExerciseId('');
                   setQuickNewExerciseName('');
                   setQuickCreateMode(false);
+                  setRoutineAddMuscleGroup('');
+                  setRoutineAddExerciseId('');
+                  setShowRoutineAddForm(false);
                   setReplacingSlotKey(null);
                   setOpenMenuSlotKey(null);
                   setShowShuffleForm(false);
@@ -1258,6 +1391,19 @@ function LogWorkout({ routines, exercises, growthSettings, onSessionAdd, onExerc
                   </>
                 ) : (
                   <div className="text-xs text-gray-600 dark:text-gray-400">No previous workout data.</div>
+                )}
+              </div>
+
+              <div>
+                <div className="text-sm font-semibold dark:text-white mb-1">Notes from previous session</div>
+                {infoData.previousNote ? (
+                  <div className="text-xs text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
+                    {infoData.previousNote}
+                  </div>
+                ) : (
+                  <div className="text-xs text-gray-600 dark:text-gray-400">
+                    No previous notes yet.
+                  </div>
                 )}
               </div>
 
