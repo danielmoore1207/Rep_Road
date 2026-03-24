@@ -272,7 +272,10 @@ function AppContent({
   return (
     <div className="min-h-screen bg-gray-100 dark:bg-gray-900 transition-colors">
       <Navigation theme={theme} />
-      <main className="container mx-auto px-4 py-8 pb-28">
+      <main
+        className="container mx-auto px-4 pt-8 pb-28"
+        style={{ paddingTop: 'calc(env(safe-area-inset-top) + 2rem)' }}
+      >
         {supabaseError && (
           <div className="mb-4 bg-red-50 dark:bg-red-900/20 border border-red-300 dark:border-red-800 text-red-700 dark:text-red-300 px-4 py-3 rounded-lg text-sm">
             Supabase: {supabaseError}
