@@ -746,17 +746,20 @@ function LogWorkout({ routines, exercises, growthSettings, onSessionAdd, onExerc
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Workout Date
               </label>
-              <input
-                type="date"
-                value={workoutDate}
-                onChange={(e) => {
-                  const nextDate = e.target.value;
-                  setWorkoutDate(nextDate);
-                  persistDraft({ workoutDate: nextDate });
-                }}
-                max={getTodayDateString()}
-                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white box-border"
-              />
+              <div className="w-full overflow-hidden rounded-lg">
+                <input
+                  type="date"
+                  value={workoutDate}
+                  onChange={(e) => {
+                    const nextDate = e.target.value;
+                    setWorkoutDate(nextDate);
+                    persistDraft({ workoutDate: nextDate });
+                  }}
+                  max={getTodayDateString()}
+                  className="block w-full min-w-0 max-w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white box-border appearance-none"
+                  style={{ WebkitAppearance: 'none' }}
+                />
+              </div>
             </div>
           )}
 
