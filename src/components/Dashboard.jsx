@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { subDays, format, parseISO, isWithinInterval } from 'date-fns';
-import { predictNextSession, suggestWeightIncrease, trackGrowth, linearRegression } from '../utils/predictions';
+import { suggestWeightIncrease, trackGrowth } from '../utils/predictions';
 
 const MUSCLE_GROUPS = [
   'Chest', 'Back', 'Shoulders', 'Arms', 'Legs', 
@@ -58,6 +58,18 @@ function Dashboard({ exercises, sessions, routines, growthSettings, oneRmUnit })
     );
     return Array.from(groups).sort();
   }, [exercises]);
+
+  const repRangeByExerciseId = useMemo(() => {
+    const map = new Map();
+    (routines || []).forEach((routine) => {
+      (routine.exercises || []).forEach((re) => {
+        if (!map.has(re.exerciseId)) {
+          map.set(re.exerciseId, { min: re.repRangeMin, max: re.repRangeMax });
+        }
+      });
+    });
+    return map;
+  }, [routines]);
 
   // Calculate e1RM-based growth data for the selected muscle group for the last 30 days
   const chartData = useMemo(() => {
@@ -136,16 +148,24 @@ function Dashboard({ exercises, sessions, routines, growthSettings, oneRmUnit })
       if (!baseline) return;
 
       const values = dates.map((d) => dateMap.get(d));
-      const lr = linearRegression(values.map((v, idx) => ({ x: idx + 1, y: v })));
+      const allExerciseSessions = allSessions
+        .filter((session) => session.exerciseId === exerciseId)
+        .sort((a, b) => new Date(a.date) - new Date(b.date));
+      const mode = growthSettings?.progressionMode || 'moderate';
+      const repRange = repRangeByExerciseId.get(exerciseId) || null;
 
       const growthMap = new Map();
       const predGrowthMap = new Map();
       values.forEach((value, idx) => {
-        const predicted = lr.slope * (idx + 1) + lr.intercept;
+        const dateKey = dates[idx];
+        const dateObj = parseISO(dateKey);
+        const sessionsUpToDate = allExerciseSessions.filter((session) => new Date(session.date) <= dateObj);
+        const suggestion = suggestWeightIncrease(sessionsUpToDate, repRange, mode);
+        const predicted = suggestion?.suggestedWeight ?? value;
         const growth = ((value - baseline) / baseline) * 100;
         const predGrowth = ((predicted - baseline) / baseline) * 100;
-        growthMap.set(dates[idx], growth);
-        predGrowthMap.set(dates[idx], predGrowth);
+        growthMap.set(dateKey, growth);
+        predGrowthMap.set(dateKey, predGrowth);
       });
 
       exerciseGrowthByDate.set(exerciseId, growthMap);
@@ -186,26 +206,19 @@ function Dashboard({ exercises, sessions, routines, growthSettings, oneRmUnit })
     });
 
     return dataPoints;
-  }, [exercises, sessions, selectedMuscleGroup]);
+  }, [exercises, sessions, selectedMuscleGroup, growthSettings, repRangeByExerciseId]);
 
   const exerciseStats = useMemo(() => {
     return exercises.map(exercise => {
       const exerciseSessions = sessions.filter(s => s.exerciseId === exercise.id);
-      const prediction = predictNextSession(exerciseSessions, 'weight');
-      
-      // Find rep range from routines for this exercise
-      let repRange = null;
-      for (const routine of routines || []) {
-        const routineExercise = routine.exercises?.find(re => re.exerciseId === exercise.id);
-        if (routineExercise) {
-          repRange = { min: routineExercise.repRangeMin, max: routineExercise.repRangeMax };
-          break; // Use first found
-        }
-      }
-      
+      const repRange = repRangeByExerciseId.get(exercise.id) || null;
       const suggestion = suggestWeightIncrease(exerciseSessions, repRange, growthSettings?.progressionMode || 'moderate');
+      const prediction = {
+        predictedValue: suggestion?.suggestedWeight ?? 0,
+        method: `brzycki_rts_${growthSettings?.progressionMode || 'moderate'}`,
+      };
       const growth = exerciseSessions.length >= 2 
-        ? trackGrowth(exerciseSessions, prediction) 
+        ? trackGrowth(exerciseSessions, { predictedValue: suggestion?.suggestedWeight ?? 0 }) 
         : null;
 
       return {
@@ -218,7 +231,7 @@ function Dashboard({ exercises, sessions, routines, growthSettings, oneRmUnit })
         lastSession: exerciseSessions[exerciseSessions.length - 1],
       };
     });
-  }, [exercises, sessions, routines]);
+  }, [exercises, sessions, repRangeByExerciseId, growthSettings]);
 
   return (
     <div className="space-y-6">
@@ -396,10 +409,10 @@ function Dashboard({ exercises, sessions, routines, growthSettings, oneRmUnit })
                   <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg">
                     <div className="text-sm text-gray-600 dark:text-gray-400 mb-1">Predicted Next Session</div>
                     <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
-                      {prediction.predictedValue.toFixed(1)} kg
+                      {prediction.predictedValue.toFixed(2)} kg
                     </div>
                     <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                      Confidence: {Math.round(prediction.confidence * 100)}%
+                      Based on Brzycki + RTS ({growthSettings?.progressionMode || 'moderate'} mode)
                     </div>
                   </div>
 
