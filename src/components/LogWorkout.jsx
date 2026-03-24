@@ -17,6 +17,10 @@ function LogWorkout({ routines, exercises, onSessionAdd, onExerciseUpdate, rpeEn
   const [draggingKey, setDraggingKey] = useState(null);
   const draggingKeyRef = useRef(null);
   const pointerIdRef = useRef(null);
+  const [openMenuSlotKey, setOpenMenuSlotKey] = useState(null);
+  const [replacingSlotKey, setReplacingSlotKey] = useState(null);
+  const [showShuffleForm, setShowShuffleForm] = useState(false);
+  const [infoSlotKey, setInfoSlotKey] = useState(null);
   const [quickMuscleGroup, setQuickMuscleGroup] = useState('');
   const [quickExerciseId, setQuickExerciseId] = useState('');
   const [quickNewExerciseName, setQuickNewExerciseName] = useState('');
@@ -112,6 +116,61 @@ function LogWorkout({ routines, exercises, onSessionAdd, onExerciseUpdate, rpeEn
     if (rpes.length === 0) return null;
     const avg = rpes.reduce((sum, value) => sum + value, 0) / rpes.length;
     return Math.round(avg * 100) / 100;
+  };
+
+  const getExerciseInfo = (slotKey) => {
+    const slot = workoutData[slotKey];
+    if (!slot) return null;
+    const exercise = exercises.find((ex) => ex.id === slot.exerciseId);
+    if (!exercise) return null;
+
+    const repRange = slot.repRange || { min: 8, max: 12 };
+    const sessions = storage
+      .getSessions()
+      .filter((session) => session.exerciseId === slot.exerciseId)
+      .sort((a, b) => new Date(b.date) - new Date(a.date));
+
+    const lastSession = sessions[0] || null;
+    let topSet = null;
+
+    sessions.forEach((session) => {
+      (session.sets || []).forEach((set) => {
+        const weight = Number(set.weight) || 0;
+        const reps = Number(set.reps) || 0;
+        const inRange = reps >= repRange.min && reps <= repRange.max;
+        if (!inRange || weight <= 0) return;
+        if (!topSet || weight > topSet.weight || (weight === topSet.weight && reps > topSet.reps)) {
+          topSet = {
+            weight,
+            reps,
+            date: session.date,
+          };
+        }
+      });
+    });
+
+    const pred = predictions[slotKey];
+    const suggestedWeight = pred?.prediction?.predictedValue ?? null;
+
+    let reasoning = pred?.suggestion?.reason || 'No recommendation reason available yet.';
+    if (suggestedWeight != null && topSet) {
+      if (suggestedWeight > topSet.weight) {
+        reasoning += ` The suggested weight is above your top set (${topSet.weight} x ${topSet.reps}) because your recent trend indicates progression potential.`;
+      } else if (suggestedWeight < topSet.weight) {
+        reasoning += ` The suggested weight is below your top set (${topSet.weight} x ${topSet.reps}) to prioritize consistency in your target rep range.`;
+      } else {
+        reasoning += ` The suggested weight matches your current top set (${topSet.weight} x ${topSet.reps}), indicating consolidation before the next increase.`;
+      }
+    }
+
+    return {
+      exercise,
+      repRange,
+      lastSession,
+      topSet,
+      suggestedWeight,
+      reasoning,
+    };
   };
 
   // Start timer when routine is selected or quick mode starts
@@ -441,9 +500,9 @@ function LogWorkout({ routines, exercises, onSessionAdd, onExerciseUpdate, rpeEn
     if (pointerIdRef.current !== event.pointerId) return;
     if (!draggingKeyRef.current) return;
     const target = document.elementFromPoint(event.clientX, event.clientY);
-    const card = target?.closest?.('[data-slot-key]');
-    if (card?.dataset?.slotKey) {
-      reorderWorkoutOrder(draggingKeyRef.current, card.dataset.slotKey);
+    const row = target?.closest?.('[data-shuffle-key]');
+    if (row?.dataset?.shuffleKey) {
+      reorderWorkoutOrder(draggingKeyRef.current, row.dataset.shuffleKey);
     }
     event.preventDefault();
   };
@@ -453,6 +512,16 @@ function LogWorkout({ routines, exercises, onSessionAdd, onExerciseUpdate, rpeEn
     setDraggingKey(null);
     draggingKeyRef.current = null;
     pointerIdRef.current = null;
+  };
+
+  const handleToggleReplace = (slotKey) => {
+    setReplacingSlotKey((prev) => (prev === slotKey ? null : slotKey));
+    setOpenMenuSlotKey(null);
+  };
+
+  const handleOpenShuffle = () => {
+    setShowShuffleForm(true);
+    setOpenMenuSlotKey(null);
   };
 
 
@@ -481,6 +550,9 @@ function LogWorkout({ routines, exercises, onSessionAdd, onExerciseUpdate, rpeEn
       ...prev,
       [slotKey]: { prediction: pred, suggestion, avgRpe: getRecentAvgRpe(sessions) },
     }));
+
+    // Close replace UI after one selection; user can reopen from menu.
+    setReplacingSlotKey(null);
   };
 
   const handleFinishWorkout = (e) => {
@@ -586,6 +658,9 @@ function LogWorkout({ routines, exercises, onSessionAdd, onExerciseUpdate, rpeEn
     setQuickExerciseId('');
     setQuickNewExerciseName('');
     setQuickCreateMode(false);
+    setReplacingSlotKey(null);
+    setOpenMenuSlotKey(null);
+    setShowShuffleForm(false);
     storage.clearActiveWorkoutDraft();
     if (onActiveWorkoutClear) onActiveWorkoutClear();
     
@@ -596,10 +671,12 @@ function LogWorkout({ routines, exercises, onSessionAdd, onExerciseUpdate, rpeEn
   const filteredQuickExercises = quickMuscleGroup
     ? exercises.filter((ex) => ex.muscleGroup === quickMuscleGroup)
     : exercises;
+  const infoData = infoSlotKey ? getExerciseInfo(infoSlotKey) : null;
 
   return (
-    <div className="max-w-4xl mx-auto">
-      <h2 className="text-2xl font-bold mb-6 dark:text-white">📝 Log Workout</h2>
+    <>
+      <div className="max-w-4xl mx-auto">
+        <h2 className="text-2xl font-bold mb-6 dark:text-white">📝 Log Workout</h2>
 
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
         <form onSubmit={handleFinishWorkout} className="space-y-6">
@@ -815,6 +892,57 @@ function LogWorkout({ routines, exercises, onSessionAdd, onExerciseUpdate, rpeEn
 
           {(selectedRoutineData || logMode === 'quick') && (
             <div className="space-y-6">
+              {showShuffleForm && (
+                <div className="border border-gray-200 dark:border-gray-600 rounded-lg p-4 bg-gray-50 dark:bg-gray-700">
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-sm font-semibold dark:text-white">Shuffle Exercises</h3>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowShuffleForm(false);
+                        setDraggingKey(null);
+                        draggingKeyRef.current = null;
+                        pointerIdRef.current = null;
+                      }}
+                      className="text-sm text-gray-600 dark:text-gray-300 hover:underline"
+                    >
+                      Done
+                    </button>
+                  </div>
+                  <div className="space-y-2">
+                    {workoutOrder.map((slotKey) => {
+                      const slot = workoutData[slotKey];
+                      if (!slot) return null;
+                      const slotExercise = exercises.find((ex) => ex.id === slot.exerciseId);
+                      if (!slotExercise) return null;
+                      return (
+                        <div
+                          key={`shuffle-${slotKey}`}
+                          data-shuffle-key={slotKey}
+                          onDragOver={handleDragOver}
+                          onDrop={() => handleDrop(slotKey)}
+                          className="flex items-center gap-3 border border-gray-200 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-800"
+                        >
+                          <button
+                            type="button"
+                            draggable
+                            onDragStart={() => handleDragStart(slotKey)}
+                            onPointerDown={(event) => handlePointerDown(slotKey, event)}
+                            onPointerMove={handlePointerMove}
+                            onPointerUp={handlePointerUp}
+                            className="text-gray-500 dark:text-gray-300 cursor-move touch-none"
+                            aria-label={`Reorder ${slotExercise.name}`}
+                          >
+                            ☰
+                          </button>
+                          <div className="text-sm dark:text-white">{slotExercise.name}</div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
               {workoutOrder.map((slotKey) => {
                 const data = workoutData[slotKey];
                 if (!data) return null;
@@ -827,59 +955,88 @@ function LogWorkout({ routines, exercises, onSessionAdd, onExerciseUpdate, rpeEn
                 return (
                   <div
                     key={slotKey}
-                    data-slot-key={slotKey}
                     className="border border-gray-200 dark:border-gray-600 rounded-lg p-4 bg-gray-50 dark:bg-gray-700"
-                    onDragOver={handleDragOver}
-                    onDrop={() => handleDrop(slotKey)}
                   >
-                    <div className="flex justify-between items-start mb-4">
+                    <div className="flex justify-between items-start mb-4 gap-3">
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-1">
-                          <button
-                            type="button"
-                            className="cursor-move text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 touch-none"
-                            aria-label="Drag to reorder"
-                            draggable
-                            onDragStart={() => handleDragStart(slotKey)}
-                            onPointerDown={(event) => handlePointerDown(slotKey, event)}
-                            onPointerMove={handlePointerMove}
-                            onPointerUp={handlePointerUp}
-                          >
-                            ☰
-                          </button>
                           <h3 className="text-lg font-bold dark:text-white">{exercise.name}</h3>
                         </div>
                         <p className="text-sm text-gray-600 dark:text-gray-400">
                           Target: {targetRepRange.min}-{targetRepRange.max} reps
                         </p>
-                        <div className="mt-2">
-                          <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Replace Exercise</label>
-                          <select
-                            value={data.exerciseId}
-                            onChange={(e) => handleReplaceExercise(slotKey, e.target.value)}
-                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
-                          >
-                            {(exercises.filter((ex) => ex.muscleGroup === exercise.muscleGroup).length
-                              ? exercises.filter((ex) => ex.muscleGroup === exercise.muscleGroup)
-                              : exercises
-                            ).map((ex) => (
-                              <option key={ex.id} value={ex.id}>
-                                {ex.name} ({ex.muscleGroup})
-                              </option>
-                            ))}
-                          </select>
-                        </div>
+                        {replacingSlotKey === slotKey && (
+                          <div className="mt-2">
+                            <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Replace Exercise</label>
+                            <select
+                              value={data.exerciseId}
+                              onChange={(e) => handleReplaceExercise(slotKey, e.target.value)}
+                              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
+                            >
+                              {(exercises.filter((ex) => ex.muscleGroup === exercise.muscleGroup).length
+                                ? exercises.filter((ex) => ex.muscleGroup === exercise.muscleGroup)
+                                : exercises
+                              ).map((ex) => (
+                                <option key={ex.id} value={ex.id}>
+                                  {ex.name} ({ex.muscleGroup})
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        )}
                       </div>
-                      <div className="flex flex-col items-end gap-2">
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveExerciseSlot(slotKey)}
-                          className="text-sm text-red-600 dark:text-red-400 hover:underline"
-                        >
-                          Remove
-                        </button>
+                      <div className="flex flex-col items-end gap-2 shrink-0">
+                        <div className="flex items-center gap-2">
+                          <div className="relative">
+                            <button
+                              type="button"
+                              onClick={() => setOpenMenuSlotKey((prev) => (prev === slotKey ? null : slotKey))}
+                              className="w-10 h-10 rounded-full bg-white text-black border border-gray-300 flex items-center justify-center text-xl leading-none dark:bg-white/10 dark:border-white/70 dark:text-white"
+                              aria-label="Exercise options"
+                            >
+                              ⋯
+                            </button>
+                            {openMenuSlotKey === slotKey && (
+                              <div className="absolute right-0 mt-2 w-44 rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 shadow-lg z-20">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    handleRemoveExerciseSlot(slotKey);
+                                    setOpenMenuSlotKey(null);
+                                    if (replacingSlotKey === slotKey) setReplacingSlotKey(null);
+                                  }}
+                                  className="w-full text-left px-3 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-gray-100 dark:hover:bg-gray-700"
+                                >
+                                  Remove Exercise
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleToggleReplace(slotKey)}
+                                  className="w-full text-left px-3 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
+                                >
+                                  Replace Exercise
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={handleOpenShuffle}
+                                  className="w-full text-left px-3 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
+                                >
+                                  Shuffle Exercise
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                          <button
+                            type="button"
+                            className="w-10 h-10 rounded-full bg-white text-black border border-gray-300 flex items-center justify-center font-semibold dark:bg-white/10 dark:border-white/70 dark:text-white"
+                            aria-label="Exercise info"
+                            onClick={() => setInfoSlotKey(slotKey)}
+                          >
+                            i
+                          </button>
+                        </div>
                         {pred && (
-                        <div className="text-right">
+                        <div className="text-right min-w-[140px]">
                           <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-2 text-sm">
                             <div className="text-xs text-gray-600 dark:text-gray-400">Suggested Weight</div>
                             <div className="text-lg font-bold text-blue-600 dark:text-blue-400">
@@ -1023,10 +1180,13 @@ function LogWorkout({ routines, exercises, onSessionAdd, onExerciseUpdate, rpeEn
                   setQuickExerciseId('');
                   setQuickNewExerciseName('');
                   setQuickCreateMode(false);
+                  setReplacingSlotKey(null);
+                  setOpenMenuSlotKey(null);
+                  setShowShuffleForm(false);
                   storage.clearActiveWorkoutDraft();
                   if (onActiveWorkoutClear) onActiveWorkoutClear();
                 }}
-                className="px-6 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                className="px-6 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors dark:bg-white/10 dark:border-white/70 dark:text-white dark:hover:bg-white/20"
               >
                 Cancel
               </button>
@@ -1046,7 +1206,88 @@ function LogWorkout({ routines, exercises, onSessionAdd, onExerciseUpdate, rpeEn
           )}
         </form>
       </div>
-    </div>
+      </div>
+
+      {infoSlotKey && infoData && (
+        <div
+          className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4"
+          onClick={() => setInfoSlotKey(null)}
+        >
+          <div
+            className="w-full max-w-md bg-white dark:bg-gray-800 rounded-xl shadow-xl p-5 border border-gray-200 dark:border-gray-600"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="flex items-start justify-between mb-4">
+              <div>
+                <h3 className="text-lg font-bold dark:text-white">{infoData.exercise.name}</h3>
+                <p className="text-xs text-gray-600 dark:text-gray-400">
+                  Target rep range: {infoData.repRange.min}-{infoData.repRange.max}
+                </p>
+              </div>
+              <button
+                type="button"
+                className="text-gray-500 dark:text-gray-300 hover:text-gray-700 dark:hover:text-white"
+                onClick={() => setInfoSlotKey(null)}
+                aria-label="Close info"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <div className="text-sm font-semibold dark:text-white mb-1">Last workout</div>
+                {infoData.lastSession ? (
+                  <>
+                    <div className="text-xs text-gray-600 dark:text-gray-400 mb-2">
+                      {new Date(infoData.lastSession.date).toLocaleString()}
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {(infoData.lastSession.sets || []).map((set, idx) => (
+                        <span
+                          key={idx}
+                          className="text-xs px-2 py-1 rounded bg-gray-100 dark:bg-gray-700 dark:text-white"
+                        >
+                          {(Number(set.weight) || 0).toFixed(1)}kg x {Number(set.reps) || 0}
+                        </span>
+                      ))}
+                    </div>
+                  </>
+                ) : (
+                  <div className="text-xs text-gray-600 dark:text-gray-400">No previous workout data.</div>
+                )}
+              </div>
+
+              <div>
+                <div className="text-sm font-semibold dark:text-white mb-1">Top set (in range)</div>
+                {infoData.topSet ? (
+                  <div className="text-sm dark:text-white">
+                    {infoData.topSet.weight.toFixed(1)}kg x {infoData.topSet.reps} reps
+                    <span className="block text-xs text-gray-600 dark:text-gray-400">
+                      {new Date(infoData.topSet.date).toLocaleDateString()}
+                    </span>
+                  </div>
+                ) : (
+                  <div className="text-xs text-gray-600 dark:text-gray-400">
+                    No in-range top set found yet.
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <div className="text-sm font-semibold dark:text-white mb-1">Why this suggestion</div>
+                <div className="text-xs text-gray-700 dark:text-gray-300">
+                  {infoData.suggestedWeight != null
+                    ? `Suggested weight: ${infoData.suggestedWeight.toFixed(1)}kg. `
+                    : ''}
+                  {infoData.reasoning}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
 
