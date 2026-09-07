@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { storage } from '../utils/storage';
 
-function Profile({ user, onUserUpdate, theme, onThemeChange, rpeEnabled, onRpeEnabledChange, growthSettings, onGrowthSettingsChange, oneRmUnit, onOneRmUnitChange }) {
+function Profile({ exercises, user, onUserUpdate, theme, onThemeChange, rpeEnabled, onRpeEnabledChange, growthSettings, onGrowthSettingsChange, oneRmUnit, onOneRmUnitChange }) {
   const [isSignedIn, setIsSignedIn] = useState(!!user);
   const [formData, setFormData] = useState({
     name: user?.name || '',
@@ -11,6 +11,10 @@ function Profile({ user, onUserUpdate, theme, onThemeChange, rpeEnabled, onRpeEn
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [localGrowthSettings, setLocalGrowthSettings] = useState(growthSettings);
   const [showProgressionInfo, setShowProgressionInfo] = useState(false);
+  const trackedMuscleGroups = useMemo(
+    () => Array.from(new Set((exercises || []).map((ex) => ex.muscleGroup).filter(Boolean))).sort(),
+    [exercises]
+  );
 
   const handleSignIn = (e) => {
     e.preventDefault();
@@ -63,6 +67,14 @@ function Profile({ user, onUserUpdate, theme, onThemeChange, rpeEnabled, onRpeEn
     const benchmarks = [...(localGrowthSettings?.benchmarks || [])];
     benchmarks[index] = { ...benchmarks[index], [field]: value };
     handleGrowthSettingUpdate({ benchmarks });
+  };
+
+  const handleTrackedExerciseChange = (muscleGroup, exerciseId) => {
+    const trackedExercises = {
+      ...(localGrowthSettings?.trackedExercises || {}),
+      [muscleGroup]: exerciseId,
+    };
+    handleGrowthSettingUpdate({ trackedExercises });
   };
 
   const handleResetAllData = () => {
@@ -329,6 +341,43 @@ function Profile({ user, onUserUpdate, theme, onThemeChange, rpeEnabled, onRpeEn
               >
                 Aggressive
               </button>
+            </div>
+          </div>
+
+          <div className="pt-2 border-t border-gray-200 dark:border-gray-700">
+            <h4 className="text-lg font-semibold mb-3">Tracked Exercise by Muscle Group</h4>
+            <p className="text-xs text-gray-600 dark:text-gray-400 mb-3">
+              Select one exercise per muscle group. Dashboard progression uses these exercises as the primary tracking lifts.
+            </p>
+            <div className="space-y-3">
+              {trackedMuscleGroups.length === 0 ? (
+                <div className="text-xs text-gray-500 dark:text-gray-400">
+                  No exercises found yet. Create exercises first.
+                </div>
+              ) : (
+                trackedMuscleGroups.map((group) => {
+                  const groupExercises = (exercises || []).filter((ex) => ex.muscleGroup === group);
+                  return (
+                    <div key={group}>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        {group}
+                      </label>
+                      <select
+                        value={(localGrowthSettings?.trackedExercises || {})[group] || ''}
+                        onChange={(e) => handleTrackedExerciseChange(group, e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                      >
+                        <option value="">No tracked exercise</option>
+                        {groupExercises.map((ex) => (
+                          <option key={ex.id} value={ex.id}>
+                            {ex.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  );
+                })
+              )}
             </div>
           </div>
 

@@ -40,24 +40,18 @@ function Dashboard({ exercises, sessions, routines, growthSettings, oneRmUnit })
     return growthSettings?.includeAccessories === false ? 0 : 1;
   };
 
-  // Get available muscle groups from exercises
+  // Muscle groups with a configured tracked exercise
   const growthMuscleGroups = useMemo(() => {
-    const groups = new Set(
-      exercises
-        .map(ex => ex.muscleGroup)
-        .filter(group => group && group !== 'Cardio')
-    );
-    return ['All', ...Array.from(groups).sort()];
-  }, [exercises]);
+    const groups = Object.entries(growthSettings?.trackedExercises || {})
+      .filter(([, exerciseId]) => !!exerciseId)
+      .map(([muscleGroup]) => muscleGroup)
+      .filter((group) => group && group !== 'Cardio');
+    return ['All', ...Array.from(new Set(groups)).sort()];
+  }, [growthSettings]);
 
   const insightsMuscleGroups = useMemo(() => {
-    const groups = new Set(
-      exercises
-        .map(ex => ex.muscleGroup)
-        .filter(group => group && group !== 'Cardio')
-    );
-    return Array.from(groups).sort();
-  }, [exercises]);
+    return growthMuscleGroups.filter((group) => group !== 'All');
+  }, [growthMuscleGroups]);
 
   const repRangeByExerciseId = useMemo(() => {
     const map = new Map();
@@ -71,6 +65,12 @@ function Dashboard({ exercises, sessions, routines, growthSettings, oneRmUnit })
     return map;
   }, [routines]);
 
+  const trackedExerciseByGroup = growthSettings?.trackedExercises || {};
+  const trackedExerciseIds = useMemo(
+    () => new Set(Object.values(trackedExerciseByGroup).filter(Boolean)),
+    [trackedExerciseByGroup]
+  );
+
   // Calculate e1RM-based growth data for the selected muscle group for the last 30 days
   const chartData = useMemo(() => {
     const thirtyDaysAgo = subDays(new Date(), 30);
@@ -78,10 +78,10 @@ function Dashboard({ exercises, sessions, routines, growthSettings, oneRmUnit })
     const baselineDays = Math.max(1, growthSettings?.baselineDays || 7);
     const baselineEnd = subDays(today, 30 - baselineDays);
 
-    // Filter exercises by selected muscle group
-    const relevantExercises = selectedMuscleGroup === 'All' 
-      ? exercises.filter(ex => ex.muscleGroup !== 'Cardio')
-      : exercises.filter(ex => ex.muscleGroup === selectedMuscleGroup);
+    // Filter exercises by selected tracked lifts per muscle group
+    const relevantExercises = selectedMuscleGroup === 'All'
+      ? exercises.filter((ex) => trackedExerciseIds.has(ex.id))
+      : exercises.filter((ex) => ex.muscleGroup === selectedMuscleGroup && trackedExerciseByGroup[selectedMuscleGroup] === ex.id);
 
     if (relevantExercises.length === 0) {
       return [];
@@ -206,10 +206,13 @@ function Dashboard({ exercises, sessions, routines, growthSettings, oneRmUnit })
     });
 
     return dataPoints;
-  }, [exercises, sessions, selectedMuscleGroup, growthSettings, repRangeByExerciseId]);
+  }, [exercises, sessions, selectedMuscleGroup, growthSettings, repRangeByExerciseId, trackedExerciseByGroup, trackedExerciseIds]);
 
   const exerciseStats = useMemo(() => {
-    return exercises.map(exercise => {
+    const sourceExercises = trackedExerciseIds.size > 0
+      ? exercises.filter((exercise) => trackedExerciseIds.has(exercise.id))
+      : exercises;
+    return sourceExercises.map(exercise => {
       const exerciseSessions = sessions.filter(s => s.exerciseId === exercise.id);
       const repRange = repRangeByExerciseId.get(exercise.id) || null;
       const suggestion = suggestWeightIncrease(exerciseSessions, repRange, growthSettings?.progressionMode || 'moderate');
@@ -231,7 +234,7 @@ function Dashboard({ exercises, sessions, routines, growthSettings, oneRmUnit })
         lastSession: exerciseSessions[exerciseSessions.length - 1],
       };
     });
-  }, [exercises, sessions, repRangeByExerciseId, growthSettings]);
+  }, [exercises, sessions, repRangeByExerciseId, growthSettings, trackedExerciseIds]);
 
   return (
     <div className="space-y-6">
@@ -252,7 +255,11 @@ function Dashboard({ exercises, sessions, routines, growthSettings, oneRmUnit })
 
         {chartData.length === 0 ? (
           <div className="h-64 flex items-center justify-center text-gray-500 dark:text-gray-400">
-            <p>No workout data available for the last 30 days. Start logging workouts to see your growth!</p>
+            <p>
+              {growthMuscleGroups.length <= 1
+                ? 'Set tracked exercises in Profile settings to start muscle-group progression tracking.'
+                : 'No workout data available for the tracked exercises in the last 30 days.'}
+            </p>
           </div>
         ) : (
           <ResponsiveContainer width="100%" height={400}>
@@ -380,6 +387,7 @@ function Dashboard({ exercises, sessions, routines, growthSettings, oneRmUnit })
             <select
               value={selectedInsightsGroup}
               onChange={(e) => setSelectedInsightsGroup(e.target.value)}
+              disabled={insightsMuscleGroups.length === 0}
               className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
             >
               <option value="">Select muscle group...</option>

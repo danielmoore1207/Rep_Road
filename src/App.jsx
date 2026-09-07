@@ -336,6 +336,7 @@ function AppContent({
             path="/profile" 
             element={
               <Profile 
+                exercises={exercises}
                 user={user}
                 onUserUpdate={onUserUpdate}
                 theme={theme}

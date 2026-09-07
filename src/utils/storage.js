@@ -110,6 +110,7 @@ export const storage = {
           includeAccessories: true,
           formula: 'epley',
           progressionMode: 'moderate',
+          trackedExercises: {},
           benchmarks: [
             { name: 'Squat', weight: 0.4 },
             { name: 'Bench', weight: 0.3 },
