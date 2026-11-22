@@ -8,7 +8,7 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       manifestFilename: 'manifest.json',
-      includeAssets: ['pwa-icon.svg'],
+      includeAssets: ['pwa-icon.png'],
       manifest: {
         name: 'RepRoad Gym Tracker',
         short_name: 'RepRoad',
@@ -20,10 +20,10 @@ export default defineConfig({
         orientation: 'portrait',
         icons: [
           {
-            src: '/pwa-icon.svg',
-            sizes: 'any',
-            type: 'image/svg+xml',
-            purpose: 'any',
+            src: '/pwa-icon.png',
+            sizes: '502x504',
+            type: 'image/png',
+            purpose: 'any maskable',
           },
         ],
       },
